@@ -207,6 +207,9 @@ export function QrFileUpload({
           </p>
         </div>
       </div>
+      <p className="qr-file-capacity-note">
+        合計500MBまで。ドロップしただけでは公開されません。
+      </p>
       <div className="qr-file-fields">
         <label>
           管理用の名前
@@ -281,7 +284,6 @@ export function QrFileUpload({
             disabled={busy || pending}
             onChange={(e) => selectFile(e.target.files)}
           />
-          <small>合計500MBまで。ドロップしただけでは公開されません。</small>
         </div>
       </div>
       {file && (

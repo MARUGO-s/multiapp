@@ -646,6 +646,16 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  align-items: start;
+}
+.qr-file-capacity-note {
+  margin: 0;
+  color: #697184;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.qr-file-fields > label {
+  align-content: start;
 }
 .qr-file-upload label {
   display: grid;
@@ -660,6 +670,7 @@
   border-radius: 10px;
   background: white;
   font: inherit;
+  margin-top: 0;
 }
 .qr-file-upload small {
   color: #697184;
@@ -707,6 +718,7 @@
   display: grid;
   gap: 8px;
   font-size: 14px;
+  line-height: 1.7;
 }
 .qr-file-dropzone {
   border: 2px dashed #c8bfdf;
