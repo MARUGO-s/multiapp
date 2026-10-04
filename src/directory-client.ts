@@ -47,6 +47,13 @@ export const directoryStatuses: Record<string, string> = {
   granted: "機能許可あり",
 };
 export type DirectoryRow = {
+  control?: {
+    version: string;
+    actions: ("approve" | "suspend")[];
+    reason: string;
+    status: string;
+    scope: string;
+  } | null;
   key: string;
   app_id: string;
   user_id: string;
@@ -75,14 +82,27 @@ export class DirectoryError extends Error {
     super(message);
   }
 }
-async function request<T>(url: string): Promise<T> {
+async function request<T>(
+  url: string,
+  operation?: { body: unknown; actor: string },
+): Promise<T> {
   const { data, error } = await qrAuth.auth.getSession();
   if (error || !data.session)
     throw new DirectoryError(401, "Googleでログインしてください。");
+  if (operation && data.session.user.id !== operation.actor)
+    throw new DirectoryError(
+      403,
+      "アカウントが変わりました。操作を中止しました。",
+    );
   let r: Response;
   try {
     r = await fetch(url, {
-      headers: { Authorization: "Bearer " + data.session.access_token },
+      method: operation ? "POST" : "GET",
+      headers: {
+        Authorization: "Bearer " + data.session.access_token,
+        ...(operation ? { "Content-Type": "application/json" } : {}),
+      },
+      body: operation ? JSON.stringify(operation.body) : undefined,
       cache: "no-store",
       credentials: "omit",
       signal: AbortSignal.timeout(30000),
@@ -100,12 +120,47 @@ async function request<T>(url: string): Promise<T> {
   return body;
 }
 export async function checkDirectoryAdmin() {
-  const result = await request<{ authorized: boolean; actor: string }>(
-    SUPABASE_URL + "/functions/v1/marugo-directory/authorize",
-  );
+  const result = await request<{
+    authorized: boolean;
+    actor: string;
+    canManage: boolean;
+  }>(SUPABASE_URL + "/functions/v1/marugo-directory/authorize");
   if (result.authorized !== true)
     throw new DirectoryError(403, "管理者の閲覧権限が必要です。");
   return result;
+}
+export type DirectoryChange = {
+  requestId: string;
+  key: string;
+  action: "approve" | "suspend";
+  version: string;
+  reason: string;
+};
+export function changeDirectoryAccess(actor: string, body: DirectoryChange) {
+  return request<{
+    ok: boolean;
+    key: string;
+    status: string;
+    requestId: string;
+  }>(SUPABASE_URL + "/functions/v1/marugo-directory/change", { body, actor });
+}
+export type DirectoryHistory = {
+  rows: {
+    id: number;
+    actor_id: string;
+    target_key: string;
+    action: string;
+    reason: string;
+    created_at: string;
+    before_status: string;
+    after_status: string;
+  }[];
+  nextOffset: number | null;
+};
+export function getDirectoryHistory(offset = 0) {
+  return request<DirectoryHistory>(
+    SUPABASE_URL + "/functions/v1/marugo-directory/history?offset=" + offset,
+  );
 }
 export function getDirectoryPage(
   source: (typeof directorySources)[number],

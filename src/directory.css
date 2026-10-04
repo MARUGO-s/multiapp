@@ -438,7 +438,119 @@ body {
     font-size: 22px;
   }
 }
+.dir-approvals {
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid #c4c2ef;
+  border-radius: 18px;
+  background: #fff;
+}
+.dir-approvals .dir-source-heading {
+  padding: 0;
+}
+.dir-approval-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+.directory .dir-danger {
+  background: #a83142;
+  color: white;
+}
+.dir-approval-list {
+  max-height: 440px;
+  overflow-y: auto;
+  margin-bottom: 24px;
+}
+.dir-approval-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 4px;
+  border-bottom: 1px solid #e8e8f1;
+}
+.dir-approval-row > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dir-approval-row input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: #6956d8;
+}
+.dir-approvals small,
+.dir-confirm small {
+  display: block;
+  color: #62677a;
+  font-size: 12px;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.dir-confirm {
+  border: 1px solid #d9d8eb;
+  border-radius: 20px;
+  padding: 28px;
+  width: min(640px, calc(100vw - 40px));
+  max-height: 85vh;
+  overflow: auto;
+  color: #23263b;
+}
+.dir-confirm::backdrop {
+  background: #171a32aa;
+}
+.dir-confirm li {
+  margin: 16px 0;
+  overflow-wrap: anywhere;
+}
+.dir-confirm label {
+  display: block;
+  margin: 20px 0;
+  font-weight: 600;
+}
+.dir-confirm textarea {
+  display: block;
+  width: 100%;
+  min-height: 90px;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid #bebdd3;
+  border-radius: 8px;
+  font: inherit;
+}
+.dir-confirm button {
+  margin: 6px 8px 6px 0;
+}
+.dir-warning {
+  padding: 12px;
+  background: #fff4d8;
+  border: 1px solid #dfbe6b;
+  border-radius: 8px;
+  color: #6c5011;
+}
+.dir-history {
+  max-height: 360px;
+  overflow: auto;
+  padding-left: 24px;
+}
+.dir-history li {
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
 @media (max-width: 600px) {
+  .dir-approvals {
+    padding: 18px 12px;
+  }
+  .dir-approval-row {
+    flex-wrap: wrap;
+  }
+  .dir-approval-toolbar > button {
+    flex: 1 1 160px;
+  }
   .directory {
     padding: 18px 14px;
   }

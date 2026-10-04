@@ -18,7 +18,7 @@ test("directory uses only explicit entry or fixed Google return intent", () => {
   assert.equal(isDirectoryNavigation("?account=recovery", "users"), false);
   assert.equal(isDirectoryNavigation("", "users"), false);
 });
-test("directory never adds app grants or exposes direct browser DB access", () => {
+test("directory keeps explicit, authenticated change boundaries without browser DB access", () => {
   const handler = readFileSync(
     new URL(
       "../supabase/functions/marugo-directory/handler.ts",
@@ -36,5 +36,7 @@ test("directory never adds app grants or exposes direct browser DB access", () =
   );
   assert.doesNotMatch(ui, /dangerouslySetInnerHTML/);
   assert.match(ui, /ticket !== epoch.current/);
-  assert.match(ui, /承認・停止・削除は行いません/);
+  assert.match(ui, /アカウント・データは削除しません/);
+  assert.match(handler, /marugo_directory_manage_authorized/);
+  assert.match(handler, /p_actor: actor/);
 });

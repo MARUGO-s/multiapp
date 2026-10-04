@@ -34,7 +34,7 @@ function request(path = "users", bearer = token(), options: RequestInit = {}) {
   });
 }
 Deno.test(
-  "directory: verified OAuth identity, current admin registry and strict read-only boundaries",
+  "directory: verified OAuth identity, current admin registry and scoped approval boundaries",
   async () => {
     const original = globalThis.fetch;
     const calls: { url: string; args: any }[] = [];
@@ -45,6 +45,8 @@ Deno.test(
       centralDown = false;
     let providerFailure = false,
       rateLimit = false;
+    let canManage = true;
+    let changeError = "";
     Deno.env.set("SUPABASE_URL", CENTRAL);
     Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-server-key");
     try {
@@ -78,6 +80,20 @@ Deno.test(
         if (url.pathname.endsWith("marugo_directory_authorized")) {
           return Response.json(args.p_actor === admin && !revoked);
         }
+        if (url.pathname.endsWith("marugo_directory_manage_authorized"))
+          return Response.json(canManage && !revoked);
+        if (url.pathname.endsWith("marugo_directory_change")) {
+          if (changeError)
+            return Response.json({ message: changeError }, { status: 400 });
+          return Response.json({
+            ok: true,
+            key: args.p_key,
+            requestId: args.p_request,
+            status: "active",
+          });
+        }
+        if (url.pathname.endsWith("marugo_directory_history"))
+          return Response.json({ rows: [], nextOffset: null });
         assert.equal(url.pathname, "/rest/v1/rpc/marugo_directory_page");
         if (providerFailure)
           return Response.json(
@@ -188,7 +204,58 @@ Deno.test(
       rateLimit = true;
       assert.equal((await handler(request())).status, 429);
       rateLimit = false;
+      const change = {
+        requestId: normal,
+        key: "qr:" + normal,
+        action: "approve",
+        version: "a".repeat(32),
+        reason: "所属確認",
+      };
+      const post = (body: unknown) =>
+        request("change", token(), {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + token(),
+            origin: "https://marugo-s.github.io",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+      assert.equal((await handler(post(change))).status, 200);
+      assert.equal(calls.at(-1)?.args.p_actor, admin);
+      assert.equal(calls.at(-1)?.args.p_request, normal);
+      const beforeWrites = calls.filter((c) =>
+        c.url.endsWith("marugo_directory_change"),
+      ).length;
+      for (const invalid of [
+        { ...change, actor: normal },
+        { ...change, action: "grant_admin" },
+        { ...change, key: "recipe:" + normal },
+        { ...change, version: "old" },
+        { ...change, reason: "" },
+        { ...change, reason: "x".repeat(9000) },
+        null,
+      ]) {
+        assert.ok([400, 413].includes((await handler(post(invalid))).status));
+      }
+      canManage = false;
+      assert.equal((await handler(post(change))).status, 403);
+      assert.equal(
+        calls.filter((c) => c.url.endsWith("marugo_directory_change")).length,
+        beforeWrites,
+      );
+      canManage = true;
+      changeError = "STALE_STATE";
+      assert.equal((await handler(post(change))).status, 409);
+      changeError = "ADMIN_REQUIRED";
+      assert.equal((await handler(post(change))).status, 403);
+      changeError = "";
+      assert.equal((await handler(request("change"))).status, 405);
+      assert.equal((await handler(request("history"))).status, 200);
+      assert.equal((await handler(request("history?offset=-1"))).status, 400);
       Deno.env.set("SUPABASE_URL", remote);
+      assert.equal((await handler(post(change))).status, 404);
+      assert.equal((await handler(request("history"))).status, 404);
       assert.equal((await handler(request())).status, 200);
       assert.equal(
         calls.at(-2)?.url,

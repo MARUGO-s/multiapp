@@ -5,7 +5,7 @@ r:=public.marugo_directory_page('00000000-0000-4000-8000-000000000001','','','',
 first_page:=r;
 if jsonb_array_length(r->'rows')>100 then raise exception 'PAGE_TOO_BIG'; end if;
 select count(*) into n from jsonb_array_elements(r->'rows') x where
-exists(select 1 from jsonb_object_keys(x) k where k not in ('key','app_id','user_id','email','name','status','role','affiliation','created_at','last_sign_in_at','email_verified','provider','identity_kind'));
+exists(select 1 from jsonb_object_keys(x) k where k not in ('key','app_id','user_id','email','name','status','role','affiliation','created_at','last_sign_in_at','email_verified','provider','identity_kind','control'));
 if n>0 then raise exception 'UNEXPECTED_COLUMN'; end if;
 r:=public.marugo_directory_page('00000000-0000-4000-8000-000000000001','','nonexistent-directory-test-unique','',0);
 if (r->>'total')::int<>0 then raise exception 'SEARCH_NOT_APPLIED'; end if;
