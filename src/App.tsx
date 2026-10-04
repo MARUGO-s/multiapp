@@ -35,7 +35,8 @@ import {
 } from "lucide-react";
 import { api, download, exportMultipleMeetings } from "./api";
 import { formatDuration } from "../supabase/functions/_shared/duration.mjs";
-import { isCloud, signOut } from "./cloud";
+import { isCloud, signOut, getSession } from "./cloud";
+import { signOutGoogleAccount } from "./portal-google-client";
 import {
   formatDate,
   isWorking,
@@ -687,7 +688,8 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
               className="settings-link"
               onClick={async () => {
                 try {
-                  await signOut();
+                  if (getSession()?.googleUserId) await signOutGoogleAccount();
+                  else await signOut();
                 } catch {
                   notify("ログアウトできませんでした。再度お試しください。");
                 }

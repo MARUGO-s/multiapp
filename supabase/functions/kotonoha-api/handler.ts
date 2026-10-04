@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { googleAuthRoute } from "../_shared/kotonoha-google-auth.ts";
 import { z } from "zod";
 import { meetingDuration } from "../_shared/duration.mjs";
 import {
@@ -1024,6 +1025,9 @@ export async function handler(req: Request) {
     }
     if (route.startsWith("/bot/meetings/")) {
       return await handleBotRoute(req, route, json);
+    }
+    if (route.startsWith("/auth/google/")) {
+      return json(await googleAuthRoute(req, route, (name,args) => service.rpc(name,args)));
     }
     if (route === "/auth/login" && req.method === "POST") {
       const input = z

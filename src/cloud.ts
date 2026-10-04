@@ -7,7 +7,11 @@ export const isCloud =
 export const CLOUD_API = `${SUPABASE_URL}/functions/v1/kotonoha-api`;
 const SESSION_KEY = "kotonoha-shared-session";
 export const SESSION_EVENT = "kotonoha-session-change";
-export type SharedSession = { token: string; expiresAt: string };
+export type SharedSession = {
+  token: string;
+  expiresAt: string;
+  googleUserId?: string;
+};
 
 export function getSession(): SharedSession | null {
   try {
@@ -28,6 +32,15 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   window.dispatchEvent(new Event(SESSION_EVENT));
 }
+export function saveSession(data: SharedSession) {
+  if (
+    !/^ktn_[0-9a-f]{64}$/.test(data.token) ||
+    !(Date.parse(data.expiresAt) > Date.now())
+  )
+    throw new Error("ログイン情報を確認できませんでした。");
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
 export async function signIn(loginId: string, password: string) {
   const response = await fetch(`${CLOUD_API}/auth/login`, {
     method: "POST",
@@ -39,8 +52,7 @@ export async function signIn(loginId: string, password: string) {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "ログインできませんでした。");
-  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
-  window.dispatchEvent(new Event(SESSION_EVENT));
+  saveSession(data);
 }
 export async function signOut() {
   const session = getSession();

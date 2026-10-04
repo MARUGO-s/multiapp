@@ -14,9 +14,11 @@ import { passwordProblem } from "./qr-account-routing.mjs";
 export function QrAccountAccess({
   onAuthenticated,
   onBusy,
+  sharedGoogle = false,
 }: {
   onAuthenticated: () => void;
   onBusy?: (busy: boolean) => void;
+  sharedGoogle?: boolean;
 }) {
   const [mode, setMode] = useState<
     "login" | "signup" | "forgot" | "resend" | "recovery"
@@ -210,7 +212,9 @@ export function QrAccountAccess({
     try {
       await signInQrWithGoogle();
     } catch {
-      setError("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。");
+      setError(
+        "Googleログインを開始できませんでした。時間をおいてもう一度お試しください。",
+      );
       submitting.current = false;
       setBusy(false);
     }
@@ -267,12 +271,19 @@ export function QrAccountAccess({
         </>
       ) : (
         <form onSubmit={submit}>
-          {mode === "login" && qrGoogleAuthEnabled && <>
-            <button type="button" className="button secondary" disabled={busy} onClick={() => void googleLogin()}>
-              Googleで続ける
-            </button>
-            <p>またはメールアドレスでログイン</p>
-          </>}
+          {mode === "login" && qrGoogleAuthEnabled && !sharedGoogle && (
+            <>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={busy}
+                onClick={() => void googleLogin()}
+              >
+                Googleで続ける
+              </button>
+              <p>またはメールアドレスでログイン</p>
+            </>
+          )}
           {mode !== "recovery" && (
             <label className="field">
               メールアドレス

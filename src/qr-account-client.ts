@@ -2,7 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./cloud";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
 
-// Separate from kotonoha's shared-ID session and other apps' Auth storage keys.
+// One native identity client for QR + portal. Existing storage is preserved.
+// Separate from kotonoha's authorization bridge and other apps' Auth keys.
 export const qrAuth = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storageKey: "marugo-qr-auth",
@@ -25,19 +26,29 @@ export type QrAccountContext = {
   stores: QrStore[];
   email: string;
 };
-export const qrGoogleAuthEnabled = import.meta.env.VITE_QR_GOOGLE_AUTH_ENABLED === "true";
+export const qrGoogleAuthEnabled =
+  import.meta.env.VITE_QR_GOOGLE_AUTH_ENABLED === "true";
+export const portalGoogleAuthEnabled =
+  import.meta.env.VITE_PORTAL_GOOGLE_AUTH_ENABLED === "true";
 export function accountRedirect(mode: "confirm" | "recovery" | "google") {
   const url = new URL(import.meta.env.BASE_URL, location.origin);
   url.searchParams.set("account", mode);
   return url.href;
 }
 export async function signInQrWithGoogle() {
-  if (!qrGoogleAuthEnabled) throw new Error("Googleログインは設定準備中です。");
+  if (!qrGoogleAuthEnabled && !portalGoogleAuthEnabled)
+    throw new Error("Googleログインは設定準備中です。");
   const { data, error } = await qrAuth.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: accountRedirect("google"), skipBrowserRedirect: true },
+    options: {
+      redirectTo: accountRedirect("google"),
+      skipBrowserRedirect: true,
+    },
   });
-  if (error || !data.url) throw new Error("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。");
+  if (error || !data.url)
+    throw new Error(
+      "Googleログインを開始できませんでした。時間をおいてもう一度お試しください。",
+    );
   location.assign(data.url);
 }
 let callback: Promise<{ recovery: boolean; message: string }> | undefined;
@@ -68,7 +79,9 @@ export function finishAccountCallback() {
     history.replaceState(null, "", url.pathname + url.search);
     if (!code || hasError)
       throw new Error(
-        google ? "Googleログインが完了しませんでした。もう一度お試しください。" : "確認リンクが無効または期限切れです。メール送信をやり直してください。",
+        google
+          ? "Googleログインが完了しませんでした。もう一度お試しください。"
+          : "確認リンクが無効または期限切れです。メール送信をやり直してください。",
       );
     let recovery = false;
     const {
@@ -81,11 +94,15 @@ export function finishAccountCallback() {
       .finally(() => subscription.unsubscribe());
     if (error || !data.session)
       throw new Error(
-        google ? "Googleログインを確認できませんでした。ログインを開始した同じブラウザーで、もう一度お試しください。" : "確認リンクを利用できませんでした。メールを送信した同じ端末・ブラウザーで開くか、送信をやり直してください。",
+        google
+          ? "Googleログインを確認できませんでした。ログインを開始した同じブラウザーで、もう一度お試しください。"
+          : "確認リンクを利用できませんでした。メールを送信した同じ端末・ブラウザーで開くか、送信をやり直してください。",
       );
     return {
       recovery,
-      message: google ? "Googleアカウントでログインしました。所属店舗の利用許可は別途確認します。" : "メールアドレスを確認しました。",
+      message: google
+        ? "Googleアカウントでログインしました。会議録・QRの利用許可はそれぞれ確認します。"
+        : "メールアドレスを確認しました。",
     };
   })();
   return callback;
