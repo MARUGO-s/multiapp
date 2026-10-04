@@ -1,8 +1,18 @@
 import { isTrackingNavigation } from "./qr-routing.mjs";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
+import {
+  isDirectoryNavigation,
+  directoryIntentKey,
+} from "./directory-routing.mjs";
 
 const initialHash = location.hash;
 const accountNavigation = isAccountNavigation(location.search, initialHash);
+let directoryIntent = "";
+try {
+  directoryIntent = sessionStorage.getItem(directoryIntentKey) || "";
+} catch {
+  /* No storage: use the explicit URL. */
+}
 window.addEventListener("hashchange", () => {
   if (
     !isAccountNavigation(location.search, location.hash) &&
@@ -14,7 +24,18 @@ window.addEventListener("hashchange", () => {
 });
 
 // A tracking link must not load the workspace or require a shared login.
-if (accountNavigation) {
+if (isDirectoryNavigation(location.search, directoryIntent)) {
+  for (const [name, content] of [
+    ["robots", "noindex, nofollow"],
+    ["referrer", "no-referrer"],
+  ]) {
+    const meta = document.createElement("meta");
+    meta.name = name;
+    meta.content = content;
+    document.head.append(meta);
+  }
+  void import("./DirectoryEntry");
+} else if (accountNavigation) {
   for (const [name, content] of [
     ["robots", "noindex, nofollow"],
     ["referrer", "no-referrer"],

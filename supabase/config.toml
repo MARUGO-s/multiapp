@@ -1,5 +1,10 @@
 project_id = "kotonoha-oem"
 
+[functions.marugo-directory]
+# Custom authentication: central Auth verification + Google OAuth AMR + UID admin registry, on every read.
+# Also deployed explicitly to gourmet and LINE; no shared service-role secrets.
+verify_jwt = false
+
 [functions.kotonoha-api]
 # JWT is verified with auth.getUser() inside the function, including new signing keys.
 verify_jwt = false

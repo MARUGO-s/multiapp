@@ -35,18 +35,23 @@ test("Application launcher preserves all seven exact public destinations without
   }
 });
 
-test("Launcher renders seven accessible, same-tab anchors independently of shared authentication", () => {
+test("Launcher preserves seven app links and adds a separate admin-only destination", () => {
   const source = readFileSync(
     new URL("../src/ExternalApplications.tsx", import.meta.url),
     "utf8",
   );
-  const compiled = ts.transpileModule(source, {
-    compilerOptions: {
-      jsx: ts.JsxEmit.ReactJSX,
-      module: ts.ModuleKind.CommonJS,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
+  const compiled = ts
+    .transpileModule(source, {
+      compilerOptions: {
+        jsx: ts.JsxEmit.ReactJSX,
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    })
+    .outputText.replaceAll(
+      "import.meta.env.BASE_URL",
+      JSON.stringify("/multiapp/"),
+    );
   const module = { exports: {} };
   const dependency = createRequire(import.meta.url);
   new Function("require", "module", "exports", compiled)(
@@ -62,9 +67,10 @@ test("Launcher renders seven accessible, same-tab anchors independently of share
   );
   assert.deepEqual(
     [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
-    expected,
+    [...expected, "/multiapp/?admin=users"],
   );
-  assert.equal((html.match(/<a /g) || []).length, 7);
+  assert.equal((html.match(/<a /g) || []).length, 8);
+  assert.match(html, /登録ユーザー管理（管理者専用）/);
   assert.match(html, /<nav[^>]+aria-labelledby="external-applications-title"/);
   assert.match(html, /id="external-applications-title"/);
   assert.ok(!html.includes('target="_blank"'));
