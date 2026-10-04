@@ -20,15 +20,18 @@ Google JWTだけでは会議を読めない。サーバー側承認確認後に�
 
 1. 対象は `hjhkccbktkscwtgzxjfq` のみ。専用migrationを確認して適用。
    `db push/reset` や過去の所有者書き換えmigrationを再実行しない。
-2. 所有者指定の管理者がGoogleログイン。AuthのUID・確認済みメール・Google identityを確認。
-   管理者は初回ログイン、サポートメール、user_metadataから自動作成しない。
-   所有者承認済みUIDを `kotonoha.google_members` に登録する。指定がない限り登録しない。
-3. kotonoha-apiを新helper込みでデプロイ、custom authのため既存verify_jwt設定を保持。
-4. Supabase Redirect URLsに正確な `https://marugo-s.github.io/multiapp/?account=google` を追加。
+2. kotonoha-apiを新helper込みでデプロイ、custom authのため既存verify_jwt設定を保持。
+3. Supabase Redirect URLsに正確な `https://marugo-s.github.io/multiapp/?account=google` を追加。
    レシピSite URLと既存URLを保持。秘密鍵の閲覧/再入力は不要。
-5. Node・Deno・SQLの認可テスト、承認/取消し/既存ログインを確認。
-6. PRのCI成功後マージ・Pages公開。`PORTAL_GOOGLE_AUTH_ENABLED=true` で共通UIを有効にする。
+4. Node・Deno・SQLの認可テスト、承認/取消し/既存ログインを確認。
+5. PRのCI成功後マージ・Pages公開。`PORTAL_GOOGLE_AUTH_ENABLED=true` で共通UIを有効にする。
    未設定なら共通Google UIは非表示。QR単独の既存フラグは独立して維持。
+   初期管理者が未登録でも、Google本人確認の入口は公開できる。
+   未承認利用者は会議を読めず、既存共通IDログインは引き続き利用できる。
+6. 所有者指定の管理者が、この入口でGoogleログイン。レシピアプリでの操作は不要。
+   AuthのUID・確認済みメール・Google identityを確認し、所有者承認済みUIDだけを
+   `kotonoha.google_members` に登録する。指定がない限り登録しない。
+   管理者は初回ログイン、サポートメール、user_metadataから自動作成しない。
 7. 所有者の実ブラウザーでGoogle認証往復、同じ会議データ、QR店舗分離を確認。
 
 ## 検証
