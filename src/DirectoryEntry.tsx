@@ -27,6 +27,7 @@ import {
   type DirectoryPage,
 } from "./directory-client";
 import "./directory.css";
+import { DirectoryApprovals } from "./DirectoryApprovals";
 
 type SourceState = { page?: DirectoryPage; busy?: boolean; error?: string };
 function date(value: string | null) {
@@ -41,6 +42,7 @@ export function UserDirectory() {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
   const [authorized, setAuthorized] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -58,6 +60,7 @@ export function UserDirectory() {
         epoch.current++;
         setSources({});
         setAuthorized(false);
+        setCanManage(false);
         setError("");
       }
       identity.current = u?.id ?? null;
@@ -105,6 +108,7 @@ export function UserDirectory() {
       )
         return;
       setAuthorized(true);
+      setCanManage(result.canManage === true);
       const selected = directorySources.filter(
         (s) =>
           !filters.app ||
@@ -233,10 +237,11 @@ export function UserDirectory() {
         <div>
           <p className="dir-eyebrow">USER DIRECTORY</p>
           <h1>登録ユーザー管理</h1>
-          <p>アプリを横断して、登録状況と利用状態を確認。</p>
+          <p>登録状況の確認と、対応アプリの申請・利用権限を管理。</p>
         </div>
         <span className="dir-readonly">
-          <LockKeyhole size={16} aria-hidden="true" /> 閲覧専用
+          <LockKeyhole size={16} aria-hidden="true" />{" "}
+          {authorized && canManage ? "承認管理者" : "管理者専用"}
         </span>
       </section>
       {error && (
@@ -374,6 +379,14 @@ export function UserDirectory() {
           <p className="dir-explainer">
             同じメールでもアプリ・接続先ごとに表示します。件数は人数ではありません。「Authのみ」はそのアプリの利用許可を意味しません。最終ログインは接続先全体の記録です。
           </p>
+          {canManage && user && (
+            <DirectoryApprovals
+              key={user.id}
+              actor={user.id}
+              rows={sources.core?.page?.rows ?? []}
+              onChanged={() => void refresh()}
+            />
+          )}
           {directorySources
             .filter(
               (s) =>
@@ -459,6 +472,9 @@ export function UserDirectory() {
                                       row.status}
                                   </span>
                                   <small>{row.role || "役割未登録"}</small>
+                                  {row.control?.reason && (
+                                    <small>{row.control.reason}</small>
+                                  )}
                                 </td>
                                 <td>{row.affiliation || "所属の記録なし"}</td>
                                 <td>{date(row.last_sign_in_at)}</td>
@@ -503,7 +519,7 @@ export function UserDirectory() {
         </>
       )}
       <footer className="dir-footnote">
-        このページから承認・停止・削除は行いません。閲覧は監査記録に残ります。共有端末では必ずログアウトしてください。
+        対応アプリの承認・停止は、専用の操作権限を持つ管理者だけが行えます。閲覧・操作は監査記録に残ります。アカウント・データは削除しません。共有端末では必ずログアウトしてください。
       </footer>
     </main>
   );

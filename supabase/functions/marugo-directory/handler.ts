@@ -29,6 +29,22 @@ async function rpc(url: string, key: string, name: string, args: unknown) {
   });
   if (!r.ok) {
     const detail = await r.json().catch(() => ({}));
+    const known: Record<string, [number, string]> = {
+      ADMIN_REQUIRED: [403, "承認操作の管理者権限がありません。"],
+      STALE_STATE: [
+        409,
+        "状態が変更されています。再読込して確認し直してください。",
+      ],
+      REQUEST_CONFLICT: [409, "操作番号が重複しています。再読込してください。"],
+      ACTION_FORBIDDEN: [409, "この利用者には指定の操作を実行できません。"],
+      MEMBER_NOT_FOUND: [404, "対象の申請・所属が見つかりません。"],
+      INVALID_INPUT: [400, "操作内容を確認してください。"],
+      UNSUPPORTED_APP: [400, "このアプリの承認はまだ対応していません。"],
+    };
+    if (known[detail.message]) {
+      const [status, message] = known[detail.message];
+      throw new Failure(status, message);
+    }
     if (detail.message === "RATE_LIMIT")
       throw new Failure(
         429,
@@ -131,7 +147,7 @@ export async function handler(req: Request): Promise<Response> {
       "Access-Control-Allow-Headers",
       "authorization, apikey, content-type",
     );
-    headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   }
   const response = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers });
@@ -139,8 +155,8 @@ export async function handler(req: Request): Promise<Response> {
     return response({ error: "この接続元は許可されていません。" }, 403);
   if (req.method === "OPTIONS")
     return new Response(null, { status: 204, headers });
-  if (req.method !== "GET")
-    return response({ error: "このページは閲覧専用です。" }, 405);
+  if (req.method !== "GET" && req.method !== "POST")
+    return response({ error: "許可されていない操作です。" }, 405);
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   if (!SOURCES.has(url) || !key)
@@ -155,14 +171,111 @@ export async function handler(req: Request): Promise<Response> {
     const u = new URL(req.url);
     const path = u.pathname.replace(/^\/functions\/v1/, "");
     if (
-      !["/marugo-directory/authorize", "/marugo-directory/users"].includes(path)
+      ![
+        "/marugo-directory/authorize",
+        "/marugo-directory/users",
+        "/marugo-directory/change",
+        "/marugo-directory/history",
+      ].includes(path)
     )
       return response({ error: "見つかりません。" }, 404);
-    if (path.endsWith("/authorize") && url !== CENTRAL)
+    const changing = path.endsWith("/change");
+    if (req.method !== (changing ? "POST" : "GET"))
+      return response({ error: "許可されていない操作です。" }, 405);
+    if (
+      (path.endsWith("/authorize") || changing || path.endsWith("/history")) &&
+      url !== CENTRAL
+    )
       return response({ error: "見つかりません。" }, 404);
     const actor = await authorize(url, key, bearer);
-    if (path.endsWith("/authorize"))
-      return response({ authorized: true, actor });
+    if (path.endsWith("/authorize")) {
+      const canManage = await rpc(
+        url,
+        key,
+        "marugo_directory_manage_authorized",
+        { p_actor: actor },
+      );
+      return response({
+        authorized: true,
+        actor,
+        canManage: canManage === true,
+      });
+    }
+    if (changing) {
+      if (
+        (await rpc(url, key, "marugo_directory_manage_authorized", {
+          p_actor: actor,
+        })) !== true
+      )
+        throw new Failure(403, "承認操作の管理者権限がありません。");
+      if (!req.headers.get("content-type")?.startsWith("application/json"))
+        throw new Failure(400, "JSON形式で送信してください。");
+      // Bound streamed bytes too; a missing/false Content-Length cannot bypass this limit.
+      const reader = req.body?.getReader();
+      if (!reader) throw new Failure(400, "操作内容がありません。");
+      let raw = "",
+        size = 0;
+      const decoder = new TextDecoder();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 8192) {
+          await reader.cancel();
+          throw new Failure(413, "操作内容が大きすぎます。");
+        }
+        raw += decoder.decode(value, { stream: true });
+      }
+      raw += decoder.decode();
+      let body;
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        throw new Failure(400, "操作内容を確認してください。");
+      }
+      if (
+        !body ||
+        typeof body !== "object" ||
+        Array.isArray(body) ||
+        Object.keys(body).some(
+          (k) =>
+            !["requestId", "key", "action", "version", "reason"].includes(k),
+        ) ||
+        typeof body.requestId !== "string" ||
+        !uuid.test(body.requestId) ||
+        typeof body.key !== "string" ||
+        !/^(kotonoha|qr):[0-9a-f-]{36}$/.test(body.key) ||
+        !uuid.test(body.key.split(":")[1]) ||
+        !["approve", "suspend"].includes(body.action) ||
+        typeof body.version !== "string" ||
+        !/^[0-9a-f]{32}$/.test(body.version) ||
+        typeof body.reason !== "string" ||
+        body.reason.trim().length < 1 ||
+        body.reason.length > 500
+      )
+        throw new Failure(400, "対象・理由・操作内容を確認してください。");
+      return response(
+        await rpc(url, key, "marugo_directory_change", {
+          p_actor: actor,
+          p_request: body.requestId,
+          p_key: body.key,
+          p_action: body.action,
+          p_version: body.version,
+          p_reason: body.reason.trim(),
+        }),
+      );
+    }
+    if (path.endsWith("/history")) {
+      const offset = u.searchParams.get("offset") ?? "0";
+      if (!/^\d{1,5}$/.test(offset) || Number(offset) > 50000)
+        throw new Failure(400, "履歴の検索条件を確認してください。");
+      return response(
+        await rpc(url, key, "marugo_directory_history", {
+          p_actor: actor,
+          p_offset: Number(offset),
+        }),
+      );
+    }
     const app = u.searchParams.get("app") ?? "";
     const search = (u.searchParams.get("q") ?? "").trim();
     const status = u.searchParams.get("status") ?? "";
