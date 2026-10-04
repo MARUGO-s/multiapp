@@ -6,14 +6,28 @@ import ts from "typescript";
 import * as routing from "../src/qr-account-routing.mjs";
 function harness(
   url,
-  { recovery = false, failure = false, fetchResult = null } = {},
+  {
+    recovery = false,
+    failure = false,
+    fetchResult = null,
+    googleEnabled = false,
+    portalEnabled = false,
+  } = {},
 ) {
   const callbacks = new Set();
   let exchanges = 0;
   let clientOptions;
   const changes = [];
+  const oauth = [];
+  const redirects = [];
+  const location = new URL(url);
+  location.assign = (target) => redirects.push(target);
   const module = { exports: {} };
   const auth = {
+    async signInWithOAuth(options) {
+      oauth.push(options);
+      return { data: { url: "https://accounts.google.com/test" }, error: null };
+    },
     getSession: async () => ({
       data: { session: { access_token: "test.native.jwt" } },
       error: null,
@@ -44,7 +58,16 @@ function harness(
     readFileSync(
       new URL("../src/qr-account-client.ts", import.meta.url),
       "utf8",
-    ).replaceAll("import.meta.env.BASE_URL", JSON.stringify("/multiapp/")),
+    )
+      .replaceAll("import.meta.env.BASE_URL", JSON.stringify("/multiapp/"))
+      .replaceAll(
+        "import.meta.env.VITE_QR_GOOGLE_AUTH_ENABLED",
+        JSON.stringify(String(googleEnabled)),
+      )
+      .replaceAll(
+        "import.meta.env.VITE_PORTAL_GOOGLE_AUTH_ENABLED",
+        JSON.stringify(String(portalEnabled)),
+      ),
     {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
@@ -63,7 +86,7 @@ function harness(
       if (fetchResult instanceof Error) throw fetchResult;
       return fetchResult;
     },
-    location: new URL(url),
+    location,
     history: {
       replaceState(...args) {
         changes.push(args[2]);
@@ -89,6 +112,8 @@ function harness(
   return {
     client: module.exports,
     changes,
+    oauth,
+    redirects,
     get exchanges() {
       return exchanges;
     },
@@ -112,6 +137,54 @@ test("QR Auth uses isolated storage and explicit PKCE callbacks", async () => {
   assert.equal(a.recovery, false);
   assert.equal(b.recovery, false);
   assert.deepEqual(h.changes, ["/multiapp/"]);
+});
+test("QR Google login is opt-in, uses isolated PKCE and has no additional scopes", async () => {
+  const disabled = harness("https://marugo-s.github.io/multiapp/");
+  await assert.rejects(disabled.client.signInQrWithGoogle(), /設定準備中/);
+  assert.equal(disabled.oauth.length, 0);
+  const enabled = harness("https://marugo-s.github.io/multiapp/", {
+    googleEnabled: true,
+  });
+  await enabled.client.signInQrWithGoogle();
+  assert.equal(enabled.oauth[0].provider, "google");
+  assert.equal(
+    enabled.oauth[0].options.redirectTo,
+    "https://marugo-s.github.io/multiapp/?account=google",
+  );
+  assert.equal(enabled.oauth[0].options.skipBrowserRedirect, true);
+  assert.equal(enabled.oauth[0].options.scopes, undefined);
+  assert.deepEqual(enabled.redirects, ["https://accounts.google.com/test"]);
+});
+test("The common portal Google flag works without enabling the old QR-only flag", async () => {
+  const h = harness("https://marugo-s.github.io/multiapp/", { portalEnabled: true });
+  assert.equal(h.client.qrGoogleAuthEnabled, false);
+  assert.equal(h.client.portalGoogleAuthEnabled, true);
+  await h.client.signInQrWithGoogle();
+  assert.equal(h.oauth[0].options.redirectTo, "https://marugo-s.github.io/multiapp/?account=google");
+  assert.equal(h.options.auth.storageKey, "marugo-qr-auth");
+});
+test("QR Google callbacks exchange once and remove codes before opening QR", async () => {
+  const h = harness(
+    "https://marugo-s.github.io/multiapp/?account=google&code=one-use",
+  );
+  const [a, b] = await Promise.all([
+    h.client.finishAccountCallback(),
+    h.client.finishAccountCallback(),
+  ]);
+  assert.equal(h.exchanges, 1);
+  assert.equal(a.recovery, false);
+  assert.equal(b.recovery, false);
+  assert.match(a.message, /会議録・QRの利用許可はそれぞれ/);
+  assert.deepEqual(h.changes, ["/multiapp/"]);
+  const denied = harness(
+    "https://marugo-s.github.io/multiapp/?account=google#error=access_denied&error_description=private",
+  );
+  await assert.rejects(
+    denied.client.finishAccountCallback(),
+    /Googleログインが完了/,
+  );
+  assert.equal(denied.exchanges, 0);
+  assert.deepEqual(denied.changes, ["/multiapp/"]);
 });
 test("Recovery mode is authorized by the SDK event, not an attacker-controlled query", async () => {
   const fake = harness(

@@ -19,6 +19,8 @@ import {
 import { api } from "./api";
 import { ExternalApplications } from "./ExternalApplications";
 import { QrAccountAccess } from "./QrAccountAccess";
+import { PortalGoogleAccess } from "./PortalGoogleAccess";
+import { portalGoogleAuthEnabled, qrAuth } from "./qr-account-client";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
 import "./qr-accounts.css";
 
@@ -32,7 +34,11 @@ export function AuthGate({
   ) => ReactNode;
 }) {
   const [selectedApplication, setSelectedApplication] = useState<Application>(
-    isAccountNavigation(location.search, location.hash) ? "qr" : "kotonoha",
+    isAccountNavigation(location.search, location.hash) &&
+      (!portalGoogleAuthEnabled ||
+        new URLSearchParams(location.search).get("account") !== "google")
+      ? "qr"
+      : "kotonoha",
   );
   const [application, setApplication] = useState<Application | null>(null);
   const [session, setSession] = useState<SharedSession | null>(null);
@@ -41,13 +47,41 @@ export function AuthGate({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [identity, setIdentity] = useState<string | null>(null);
+  useEffect(() => {
+    if (!portalGoogleAuthEnabled || !isCloud) return;
+    let alive = true;
+    const sync = (id: string | null) => {
+      if (!alive) return;
+      const restored = getSession();
+      if (restored?.googleUserId && restored.googleUserId !== id)
+        clearSession();
+      setIdentity(id);
+    };
+    const {
+      data: { subscription },
+    } = qrAuth.auth.onAuthStateChange((_event, current) =>
+      sync(current?.user.id ?? null),
+    );
+    void qrAuth.auth
+      .getSession()
+      .then(({ data }) => sync(data.session?.user.id ?? null));
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
   useEffect(() => {
     if (!isCloud) return;
     let alive = true;
     const sync = () => {
       const restored = getSession();
-      setSession(restored);
-      if (!restored)
+      const usable =
+        restored?.googleUserId && restored.googleUserId !== identity
+          ? null
+          : restored;
+      setSession(usable);
+      if (!usable)
         setApplication((current) => (current === "kotonoha" ? null : current));
       setLoading(false);
     };
@@ -76,7 +110,7 @@ export function AuthGate({
       window.removeEventListener(SESSION_EVENT, sync);
       window.removeEventListener("storage", sync);
     };
-  }, []);
+  }, [identity]);
   useEffect(() => {
     if (!session) return;
     const timer = setTimeout(
@@ -164,7 +198,7 @@ export function AuthGate({
           <h2>このページで開く</h2>
           <p>
             {session
-              ? "ログイン済みです。アプリを選んで開いてください。"
+              ? "会議録にログイン済みです。QRの利用権限は別途確認します。"
               : "アプリを選んでログインしてください。QRは個人のメールアドレスで利用します。"}
           </p>
           <fieldset className="application-options" disabled={busy}>
@@ -210,10 +244,19 @@ export function AuthGate({
               </label>
             ))}
           </fieldset>
+          {portalGoogleAuthEnabled && isCloud && (
+            <PortalGoogleAccess
+              application={selectedApplication}
+              onOpen={() => setApplication("kotonoha")}
+              onBusy={setBusy}
+              onIdentity={setIdentity}
+            />
+          )}
           {selectedApplication === "qr" ? (
             <QrAccountAccess
               onAuthenticated={() => setApplication("qr")}
               onBusy={setBusy}
+              sharedGoogle={portalGoogleAuthEnabled}
             />
           ) : (
             <form onSubmit={login}>
@@ -262,7 +305,7 @@ export function AuthGate({
               <div className="login-account-note">
                 <ShieldCheck size={17} />
                 <p>
-                  kotonohaはこれまでの共通IDで利用します。会議の記録はチームで共有されます。QRは個人アカウント・店舗別の管理です。共用端末では利用後にログアウトしてください。
+                  kotonohaはこれまでの共通IDも利用できます。Googleでの利用には本人連携と管理者承認が必要です。QRは個人アカウント・店舗別の管理です。共用端末では利用後にログアウトしてください。
                 </p>
               </div>
             </form>

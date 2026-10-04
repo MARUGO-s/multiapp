@@ -21,11 +21,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+        env:
+          VITE_QR_GOOGLE_AUTH_ENABLED: ${{ vars.QR_GOOGLE_AUTH_ENABLED }}
+          VITE_PORTAL_GOOGLE_AUTH_ENABLED: ${{ vars.PORTAL_GOOGLE_AUTH_ENABLED }}
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - run: deno check --config supabase/functions/kotonoha-api/deno.json supabase/functions/kotonoha-api/index.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-api.test.ts
+      - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-google-auth.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-tick.test.ts
       - run: deno check --config supabase/functions/marugo-qr/deno.json supabase/functions/marugo-qr/index.ts
       - run: deno test --allow-env --config supabase/functions/marugo-qr/deno.json tests/cloud-qr.test.ts tests/cloud-qr-files.test.ts
