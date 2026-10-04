@@ -15,6 +15,25 @@
   width: fit-content;
   margin-bottom: 24px;
 }
+.qr-create-method-tabs {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+}
+.qr-create-method-tabs button[aria-selected="true"] {
+  background: var(--purple);
+  color: white;
+}
+.qr-create-method-tabs button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.qr-page [role="tabpanel"][hidden] {
+  display: none;
+}
+.qr-create-method-tabs + [role="tabpanel"] .qr-file-upload {
+  margin-top: 0;
+}
 .qr-view-tabs button {
   display: flex;
   align-items: center;
