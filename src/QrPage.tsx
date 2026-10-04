@@ -43,9 +43,11 @@ const errorText = (error: unknown) =>
 export function QrPage({
   notify,
   onBusyChange,
+  workspaceView,
 }: {
   notify: (message: string) => void;
   onBusyChange?: (busy: boolean) => void;
+  workspaceView?: "active" | "trash";
 }) {
   const qrApi = useQrApi();
   const [title, setTitle] = useState("");
@@ -54,6 +56,16 @@ export function QrPage({
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"active" | "trash">("active");
+  useEffect(() => {
+    if (workspaceView === undefined || workspaceView === view) return;
+    setView(workspaceView);
+    setPage(0);
+    setLinks([]);
+    setTotal(0);
+    setLoading(true);
+    setSelected(null);
+    setError("");
+  }, [workspaceView, view]);
   const [confirmation, setConfirmation] = useState<{
     action: "trash" | "purge";
     link: QrLink;
@@ -331,30 +343,32 @@ export function QrPage({
         </div>
       ) : (
         <>
-          <div
-            className="qr-view-tabs qr-segmented"
-            role="group"
-            aria-label="QRコードの一覧"
-          >
-            <button
-              type="button"
-              aria-pressed={view === "active"}
-              disabled={busy}
-              onClick={() => chooseView("active")}
+          {workspaceView === undefined && (
+            <div
+              className="qr-view-tabs qr-segmented"
+              role="group"
+              aria-label="QRコードの一覧"
             >
-              <QrCode size={16} />
-              登録済みQRコード
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === "trash"}
-              disabled={busy}
-              onClick={() => chooseView("trash")}
-            >
-              <Trash2 size={16} />
-              ゴミ箱
-            </button>
-          </div>
+              <button
+                type="button"
+                aria-pressed={view === "active"}
+                disabled={busy}
+                onClick={() => chooseView("active")}
+              >
+                <QrCode size={16} />
+                登録済みQRコード
+              </button>
+              <button
+                type="button"
+                aria-pressed={view === "trash"}
+                disabled={busy}
+                onClick={() => chooseView("trash")}
+              >
+                <Trash2 size={16} />
+                ゴミ箱
+              </button>
+            </div>
+          )}
           {error && (
             <div className="error-message" role="alert">
               {error}

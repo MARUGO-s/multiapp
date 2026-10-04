@@ -120,42 +120,65 @@
   line-height: 1.7;
   margin-top: 4px;
 }
-.qr-workspace-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 24px max(24px, calc((100vw - 1200px) / 2));
-  background: white;
-  border-bottom: 1px solid var(--border);
+.qr-sidebar .brand > span:last-child {
+  font-size: 22px;
+  letter-spacing: -0.6px;
 }
-.qr-workspace-header .brand {
-  width: auto;
-  margin: 0;
-  flex-shrink: 0;
+.qr-sidebar .brand small {
+  line-height: 1.6;
 }
-.qr-workspace-tools {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+.qr-sidebar-store {
+  padding: 0 10px 24px;
+}
+.qr-sidebar-store .nav-label {
+  padding: 0;
+}
+.qr-sidebar-store .field {
+  margin-top: 14px;
+  font-size: 12px;
+}
+.qr-sidebar-store select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 8px;
+}
+.qr-sidebar-store p {
+  font-size: 13px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.qr-sidebar nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.qr-sidebar .sidebar-bottom {
+  padding-bottom: 24px;
+}
+.qr-menu-close {
+  align-self: flex-end;
+}
+.qr-workspace-topbar > div {
+  min-width: 0;
+}
+.qr-workspace-email {
+  max-width: 35%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
 }
 .qr-workspace-main {
   width: 100%;
   max-width: 1248px;
   margin: 0 auto;
-  padding: 36px 24px;
+  padding: 24px 39px 40px;
 }
 @media (max-width: 760px) {
-  .qr-workspace-header {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 24px 18px;
-    gap: 18px;
-  }
   .qr-workspace-main {
     padding: 28px 18px;
   }
-  .qr-workspace-tools .button {
-    font-size: 13px;
+  .qr-workspace-email {
+    display: none;
   }
 }
