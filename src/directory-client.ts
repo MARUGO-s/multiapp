@@ -6,7 +6,7 @@ export const directorySources = [
     name: "会議録・QR・レシピ",
     ref: "hjhkccbktkscwtgzxjfq",
     apps: ["kotonoha", "qr", "recipe"],
-    note: "琴ノ葉のGoogle連携、QRの店舗所属、レシピのプロフィール・旧IDを表示します。琴ノ葉の共通ID利用者は個人特定できません。",
+    note: "kotonohaのGoogle連携、QRの店舗所属、レシピのプロフィール・旧IDを表示します。kotonohaの共通ID利用者は個人特定できません。",
   },
   {
     id: "social",
