@@ -56,6 +56,7 @@ export function QrPage({
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [view, setView] = useState<"active" | "trash">("active");
+  const [createMode, setCreateMode] = useState<"file" | "link">("file");
   useEffect(() => {
     if (workspaceView === undefined || workspaceView === view) return;
     setView(workspaceView);
@@ -376,57 +377,126 @@ export function QrPage({
           )}
           {view === "active" && (
             <>
-              <QrFileUpload
-                busy={busy}
-                onBusy={setBusy}
-                onCreated={(link) => {
-                  if (!mounted.current) return;
-                  setSelected(link);
-                  setHistoryPage(0);
-                  setPage(0);
-                  notify("ファイルを公開してQRコードを発行しました。");
-                  void refresh();
+              <div
+                className="qr-create-method-tabs qr-segmented"
+                role="tablist"
+                aria-label="QRコードの作成方法"
+                onKeyDown={(event) => {
+                  if (busy) return;
+                  const tabs = Array.from(
+                    event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                      '[role="tab"]',
+                    ),
+                  );
+                  const current = tabs.indexOf(
+                    document.activeElement as HTMLButtonElement,
+                  );
+                  const next =
+                    event.key === "ArrowRight"
+                      ? (current + 1) % tabs.length
+                      : event.key === "ArrowLeft"
+                        ? (current - 1 + tabs.length) % tabs.length
+                        : event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? tabs.length - 1
+                            : current;
+                  if (next === current || current < 0) return;
+                  event.preventDefault();
+                  tabs[next].focus();
+                  setCreateMode(next === 0 ? "file" : "link");
                 }}
-              />
-              <form className="qr-create-card" onSubmit={create}>
-                <label>
-                  管理用の名前
-                  <input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    maxLength={120}
-                    placeholder="例：店頭ポスター・秋のキャンペーン"
-                    required
-                    disabled={busy}
-                  />
-                </label>
-                <label>
-                  リンク先URL
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    maxLength={2048}
-                    placeholder="https://example.com/"
-                    required
-                    disabled={busy}
-                  />
-                </label>
-                <button className="button primary" disabled={busy}>
-                  {busy ? (
-                    <LoaderCircle size={17} className="spin" />
-                  ) : (
-                    <QrCode size={17} />
-                  )}
-                  QRコードを作成
+              >
+                <button
+                  id="qr-create-file-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={createMode === "file"}
+                  aria-controls="qr-create-file-panel"
+                  tabIndex={createMode === "file" ? 0 : -1}
+                  disabled={busy}
+                  onClick={() => setCreateMode("file")}
+                >
+                  ファイルから作成
                 </button>
-                <p>
-                  QRには短い計測用URLが入ります。開くとアクセスを記録し、リンク先へ自動転送します。
+                <button
+                  id="qr-create-link-tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={createMode === "link"}
+                  aria-controls="qr-create-link-panel"
+                  tabIndex={createMode === "link" ? 0 : -1}
+                  disabled={busy}
+                  onClick={() => setCreateMode("link")}
+                >
+                  URLから作成
+                </button>
+              </div>
+              <div
+                id="qr-create-file-panel"
+                role="tabpanel"
+                aria-labelledby="qr-create-file-tab"
+                hidden={createMode !== "file"}
+              >
+                <QrFileUpload
+                  busy={busy}
+                  onBusy={setBusy}
+                  onCreated={(link) => {
+                    if (!mounted.current) return;
+                    setSelected(link);
+                    setHistoryPage(0);
+                    setPage(0);
+                    notify("ファイルを公開してQRコードを発行しました。");
+                    void refresh();
+                  }}
+                />
+              </div>
+              <div
+                id="qr-create-link-panel"
+                role="tabpanel"
+                aria-labelledby="qr-create-link-tab"
+                hidden={createMode !== "link"}
+              >
+                <form className="qr-create-card" onSubmit={create}>
+                  <label>
+                    管理用の名前
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={120}
+                      placeholder="例：店頭ポスター・秋のキャンペーン"
+                      required
+                      disabled={busy}
+                    />
+                  </label>
+                  <label>
+                    リンク先URL
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      maxLength={2048}
+                      placeholder="https://example.com/"
+                      required
+                      disabled={busy}
+                    />
+                  </label>
+                  <button className="button primary" disabled={busy}>
+                    {busy ? (
+                      <LoaderCircle size={17} className="spin" />
+                    ) : (
+                      <QrCode size={17} />
+                    )}
+                    QRコードを作成
+                  </button>
+                  <p>
+                    QRには短い計測用URLが入ります。開くとアクセスを記録し、リンク先へ自動転送します。
+                  </p>
+                </form>
+                <p className="qr-measure-note">
+                  QR用・ボタン用・通常リンク用のURLで経路を識別します。回数には再読み込み・直接クリック・ボットも含み、人数や移動先の表示完了は計測しません。流入元が渡されない場合や以前のURLは「不明」です。端末・ブラウザーは推定です。
                 </p>
-              </form>
-              <p className="qr-measure-note">
-                QR用・ボタン用・通常リンク用のURLで経路を識別します。回数には再読み込み・直接クリック・ボットも含み、人数や移動先の表示完了は計測しません。流入元が渡されない場合や以前のURLは「不明」です。端末・ブラウザーは推定です。
-              </p>
+              </div>
             </>
           )}
           {view === "trash" && (
