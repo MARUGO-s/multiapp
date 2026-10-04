@@ -25,10 +25,20 @@ export type QrAccountContext = {
   stores: QrStore[];
   email: string;
 };
-export function accountRedirect(mode: "confirm" | "recovery") {
+export const qrGoogleAuthEnabled = import.meta.env.VITE_QR_GOOGLE_AUTH_ENABLED === "true";
+export function accountRedirect(mode: "confirm" | "recovery" | "google") {
   const url = new URL(import.meta.env.BASE_URL, location.origin);
   url.searchParams.set("account", mode);
   return url.href;
+}
+export async function signInQrWithGoogle() {
+  if (!qrGoogleAuthEnabled) throw new Error("Googleログインは設定準備中です。");
+  const { data, error } = await qrAuth.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: accountRedirect("google"), skipBrowserRedirect: true },
+  });
+  if (error || !data.url) throw new Error("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。");
+  location.assign(data.url);
 }
 let callback: Promise<{ recovery: boolean; message: string }> | undefined;
 export function finishAccountCallback() {
@@ -37,6 +47,7 @@ export function finishAccountCallback() {
     if (!isAccountNavigation(location.search, location.hash))
       return { recovery: false, message: "" };
     const url = new URL(location.href);
+    const google = url.searchParams.get("account") === "google";
     const code = url.searchParams.get("code");
     const hasError =
       url.searchParams.has("error") || /(?:^#|&)error=/.test(url.hash);
@@ -57,7 +68,7 @@ export function finishAccountCallback() {
     history.replaceState(null, "", url.pathname + url.search);
     if (!code || hasError)
       throw new Error(
-        "確認リンクが無効または期限切れです。メール送信をやり直してください。",
+        google ? "Googleログインが完了しませんでした。もう一度お試しください。" : "確認リンクが無効または期限切れです。メール送信をやり直してください。",
       );
     let recovery = false;
     const {
@@ -70,11 +81,11 @@ export function finishAccountCallback() {
       .finally(() => subscription.unsubscribe());
     if (error || !data.session)
       throw new Error(
-        "確認リンクを利用できませんでした。メールを送信した同じ端末・ブラウザーで開くか、送信をやり直してください。",
+        google ? "Googleログインを確認できませんでした。ログインを開始した同じブラウザーで、もう一度お試しください。" : "確認リンクを利用できませんでした。メールを送信した同じ端末・ブラウザーで開くか、送信をやり直してください。",
       );
     return {
       recovery,
-      message: "メールアドレスを確認しました。",
+      message: google ? "Googleアカウントでログインしました。所属店舗の利用許可は別途確認します。" : "メールアドレスを確認しました。",
     };
   })();
   return callback;

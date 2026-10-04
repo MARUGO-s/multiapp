@@ -5,6 +5,8 @@ import {
   finishAccountCallback,
   completeAccountRecovery,
   qrAuth,
+  qrGoogleAuthEnabled,
+  signInQrWithGoogle,
   type QrStore,
 } from "./qr-account-client";
 import { passwordProblem } from "./qr-account-routing.mjs";
@@ -199,6 +201,20 @@ export function QrAccountAccess({
       setBusy(false);
     }
   }
+  async function googleLogin() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await signInQrWithGoogle();
+    } catch {
+      setError("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。");
+      submitting.current = false;
+      setBusy(false);
+    }
+  }
   if (!ready) return <p role="status">QRのログイン情報を確認しています…</p>;
   return (
     <div className="qr-account-access">
@@ -251,6 +267,12 @@ export function QrAccountAccess({
         </>
       ) : (
         <form onSubmit={submit}>
+          {mode === "login" && qrGoogleAuthEnabled && <>
+            <button type="button" className="button secondary" disabled={busy} onClick={() => void googleLogin()}>
+              Googleで続ける
+            </button>
+            <p>またはメールアドレスでログイン</p>
+          </>}
           {mode !== "recovery" && (
             <label className="field">
               メールアドレス
