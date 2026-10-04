@@ -13,7 +13,6 @@ export function PdfPreview({ url }: { url: string }) {
   const [width, setWidth] = useState(900);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [text, setText] = useState("");
   const canvas = useRef<HTMLCanvasElement>(null);
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -65,7 +64,6 @@ export function PdfPreview({ url }: { url: string }) {
     const element = canvas.current;
     setLoading(true);
     setError("");
-    setText("");
     (async () => {
       const value = await pdf.getPage(page);
       if (!alive) return;
@@ -89,13 +87,6 @@ export function PdfPreview({ url }: { url: string }) {
       await render.promise;
       if (alive) {
         setLoading(false);
-        const content = await value.getTextContent();
-        if (alive)
-          setText(
-            content.items
-              .map((item) => ("str" in item ? item.str : ""))
-              .join(" "),
-          );
       }
     })().catch((e) => {
       if (alive && e?.name !== "RenderingCancelledException") {
@@ -138,12 +129,6 @@ export function PdfPreview({ url }: { url: string }) {
           hidden={!pdf || !!error}
         />
       </div>
-      {text && (
-        <details className="pdf-text">
-          <summary>このページのテキストを読む</summary>
-          <p>{text}</p>
-        </details>
-      )}
     </section>
   );
 }
