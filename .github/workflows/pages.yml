@@ -27,6 +27,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - run: deno check supabase/functions/marugo-directory/index.ts
+      - run: deno test --allow-env tests/cloud-directory.test.ts
       - run: deno check --config supabase/functions/kotonoha-api/deno.json supabase/functions/kotonoha-api/index.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-api.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-google-auth.test.ts

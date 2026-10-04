@@ -47,6 +47,11 @@ export function ExternalApplications() {
           );
         })}
       </div>
+      <p>
+        <a href={import.meta.env.BASE_URL + "?admin=users"}>
+          登録ユーザー管理（管理者専用）
+        </a>
+      </p>
     </nav>
   );
 }

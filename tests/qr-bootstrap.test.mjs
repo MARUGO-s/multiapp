@@ -5,6 +5,10 @@ import vm from "node:vm";
 import ts from "typescript";
 import { isTrackingNavigation } from "../src/qr-routing.mjs";
 import { isAccountNavigation } from "../src/qr-account-routing.mjs";
+import {
+  isDirectoryNavigation,
+  directoryIntentKey,
+} from "../src/directory-routing.mjs";
 
 const source = ts
   .transpileModule(
@@ -18,9 +22,10 @@ const source = ts
   )
   .outputText.replace(/^import .*qr-routing.mjs.*;\s*/m, "")
   .replace(/^import .*qr-account-routing.mjs.*;\s*/m, "")
+  .replace(/^import .*directory-routing.mjs.*;\s*/m, "")
   .replaceAll("import.meta.env.BASE_URL", JSON.stringify("/multiapp/"))
   .replaceAll("import(", "loadModule(");
-function boot(hash, search = "") {
+function boot(hash, search = "", intent = "") {
   const root = { innerHTML: "" };
   const scripts = [],
     metadata = [],
@@ -52,6 +57,9 @@ function boot(hash, search = "") {
     document,
     isTrackingNavigation,
     isAccountNavigation,
+    isDirectoryNavigation,
+    directoryIntentKey,
+    sessionStorage: { getItem: () => intent },
     loadModule: (name) => {
       imports.push(name);
       return Promise.resolve();
@@ -68,6 +76,22 @@ test("QR bootstrap avoids authentication and meeting workspace for root tracking
     state.metadata.find((item) => item.name === "referrer").content,
     "no-referrer",
   );
+});
+test("Admin directory has a dedicated bootstrap and fixed Google return destination", () => {
+  for (const state of [
+    boot("", "?admin=users"),
+    boot("", "?account=google&code=one-use", "users"),
+  ]) {
+    assert.deepEqual(state.imports, ["./DirectoryEntry"]);
+    assert.equal(state.scripts.length, 0);
+    assert.equal(
+      state.metadata.find((item) => item.name === "referrer").content,
+      "no-referrer",
+    );
+  }
+  assert.deepEqual(boot("", "?account=google&code=one-use").imports, [
+    "./Workspace",
+  ]);
 });
 test("Workspace bootstrap keeps the common login and application chooser for the plain root", () => {
   const state = boot("");
