@@ -161,7 +161,7 @@ export function DirectoryApprovals({
           <p className="dir-eyebrow">ACCESS REQUESTS</p>
           <h2 id="approval-title">申請・利用権限の管理</h2>
         </div>
-        <span>琴ノ葉 / MARUGO QR</span>
+        <span>kotonoha / MARUGO QR</span>
       </div>
       <p>
         各アプリで受け付けた申請を表示します。下の一覧から最大20件を選び、まとめて承認・承認取り消しできます。管理者の役割変更・アカウント削除は行いません。
