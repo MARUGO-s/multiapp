@@ -10,6 +10,7 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
   const second = "00000000-0000-4000-8000-000000000103";
   let scope = { userId: user, storeId: first };
   let session = { user: { id: user }, access_token: "test.native.jwt" };
+  let sharedCredentials = null;
   let status = 200;
   const calls = [];
   const module = { exports: {} };
@@ -40,10 +41,14 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
         };
       if (name === "./qr-account-client")
         return {
-          qrAuth: {
-            auth: {
-              getSession: async () => ({ data: { session }, error: null }),
-            },
+          qrCredentials: async () => {
+            if (sharedCredentials) return sharedCredentials;
+            if (!session) throw new Error("ログインが必要です。");
+            return {
+              kind: "account",
+              identityKey: session.user.id,
+              token: session.access_token,
+            };
           },
         };
       if (name === "./cloud")
@@ -96,4 +101,29 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
   session = { user: { id: user }, access_token: "expired.jwt.token" };
   status = 401;
   await assert.rejects(oldStore("/links"), /有効期限/);
+  status = 200;
+  sharedCredentials = {
+    kind: "shared",
+    identityKey: "test-shared-session",
+    token: "ktn_test",
+  };
+  scope = {
+    userId: user,
+    storeId: second,
+    credentialKey: sharedCredentials.identityKey,
+  };
+  const sharedStore = module.exports.useQrApi();
+  await sharedStore("/links");
+  assert.equal(calls.at(-1).options.headers.Authorization, "Bearer ktn_test");
+  assert.equal(new URL(calls.at(-1).url).searchParams.get("storeId"), second);
+  const sharedBefore = calls.length;
+  await assert.rejects(oldStore("/links"), /ログイン情報/);
+  sharedCredentials = {
+    ...sharedCredentials,
+    identityKey: "new-shared-session",
+  };
+  await assert.rejects(sharedStore("/links"), /ログイン情報/);
+  sharedCredentials = null;
+  await assert.rejects(sharedStore("/links"), /ログイン情報/);
+  assert.equal(calls.length, sharedBefore);
 });

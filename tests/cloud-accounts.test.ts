@@ -47,6 +47,8 @@ Deno.test(
         );
         const name = url.pathname.split("/").at(-1)!;
         const args = JSON.parse(init.body);
+        if (name === "marugo_qr_shared")
+          return Response.json({ message: "INVALID_SESSION" }, { status: 400 });
         calls.push({ name, args });
         if (name === "marugo_qr_accounts") {
           const fail = (message: string) =>

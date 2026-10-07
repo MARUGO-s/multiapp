@@ -14,6 +14,7 @@ import { QrAccountManagement } from "./QrAccountManagement";
 import { QrScopeContext } from "./qr-api";
 import {
   accountApi,
+  qrCredentials,
   qrAuth,
   type QrAccountContext,
   type QrStore,
@@ -22,7 +23,7 @@ import { getSession, SESSION_EVENT, signOut as signOutShared } from "./cloud";
 
 export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const [context, setContext] = useState<QrAccountContext | null>(null);
-  const [sharedAccess, setSharedAccess] = useState(false);
+  const [credentialKey, setCredentialKey] = useState("");
   const [storeId, setStoreId] = useState("");
   const [tab, setTab] = useState<"qr" | "trash" | "accounts">("qr");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,18 +86,19 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const refresh = useCallback(async () => {
     const request = ++revision.current;
     try {
-      const {
-        data: { session: qrSession },
-      } = await qrAuth.auth.getSession();
-      const sharedSession = getSession();
-      if (!qrSession && !sharedSession) {
+      let credentials;
+      try {
+        credentials = await qrCredentials();
+      } catch {
         chooseRef.current();
         return;
       }
-      setSharedAccess(!qrSession && !!sharedSession);
-      identity.current = qrSession?.user.id || sharedSession?.token || null;
+      identity.current = credentials.identityKey;
       let next = await accountApi<QrAccountContext>("/context");
-      const requested = qrSession?.user.user_metadata?.marugo_qr_store_id;
+      const requested =
+        credentials.kind === "account"
+          ? credentials.user.user_metadata?.marugo_qr_store_id
+          : null;
       if (
         !next.member &&
         typeof requested === "string" &&
@@ -107,6 +109,9 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
           body: JSON.stringify({ storeId: requested }),
         });
       if (request !== revision.current) return;
+      if ((await qrCredentials()).identityKey !== credentials.identityKey)
+        return;
+      setCredentialKey(credentials.identityKey);
       setContext(next);
       setError("");
       setStoreId((previous) =>
@@ -156,10 +161,13 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
     });
     const onSharedSession = () => {
       ++revision.current;
+      setContext(null);
+      setCredentialKey("");
       setLoading(true);
       setTimeout(() => void refresh(), 0);
     };
     window.addEventListener(SESSION_EVENT, onSharedSession);
+    window.addEventListener("storage", onSharedSession);
     const interval = setInterval(() => {
       if (!document.hidden) void refresh();
     }, 30000);
@@ -167,6 +175,7 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
       ++revision.current;
       subscription.unsubscribe();
       window.removeEventListener(SESSION_EVENT, onSharedSession);
+      window.removeEventListener("storage", onSharedSession);
       clearInterval(interval);
     };
   }, [refresh]);
@@ -184,13 +193,13 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const scope = useMemo(
     () =>
       context?.member && storeId
-        ? { userId: context.member.user_id, storeId }
+        ? { userId: context.member.user_id, storeId, credentialKey }
         : null,
-    [context?.member?.user_id, storeId],
+    [context?.member?.user_id, storeId, credentialKey],
   );
   const active = context?.member?.status === "active";
   const admin = active && context?.member?.role === "admin";
-  const canManageAccounts = admin && !sharedAccess;
+  const canManageAccounts = admin;
   const selected = context?.stores.find((store) => store.id === storeId);
   const pageTitle =
     admin && tab === "accounts"
@@ -319,14 +328,11 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
             disabled={qrBusy}
             onClick={async () => {
               try {
-                const shared = getSession();
-                if (shared) await signOutShared();
-                else {
-                  const { error: failure } = await qrAuth.auth.signOut({
-                    scope: "local",
-                  });
-                  if (failure) throw failure;
-                }
+                if (getSession()) await signOutShared();
+                const { error: failure } = await qrAuth.auth.signOut({
+                  scope: "local",
+                });
+                if (failure) throw failure;
                 setContext(null);
                 onChooseApp();
               } catch {
