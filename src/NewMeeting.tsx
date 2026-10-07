@@ -18,6 +18,8 @@ import {
   LayoutTemplate,
 } from "lucide-react";
 import { Modal } from "./Modal";
+import { MinutesFormatField } from "./MinutesFormatField";
+import { isMinutesFormatTemplate, minutesFormat } from "../supabase/functions/_shared/minutes-formats.mjs";
 import { isCloud } from "./cloud";
 import { normalizeMeetUrl } from "../supabase/functions/_shared/bot.mjs";
 import { AttachmentPicker } from "./Attachments";
@@ -86,7 +88,7 @@ export function NewMeeting({
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [participants, setParticipants] = useState("");
-  const [template, setTemplate] = useState("detailed");
+  const [template, setTemplate] = useState<"standard" | "brief" | "detailed">("detailed");
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -222,8 +224,10 @@ export function NewMeeting({
 
   function applyTemplate(t: MeetingTemplate) {
     setSelectedTemplate(t);
-    setTitle(t.name);
-    setParticipants(t.defaultParticipants);
+    if (!isMinutesFormatTemplate(t)) {
+      setTitle(t.name);
+      setParticipants(t.defaultParticipants);
+    }
     setTemplate(t.templateType);
     setShowTemplateSelector(false);
   }
@@ -350,7 +354,8 @@ export function NewMeeting({
       <form onSubmit={submit}>
         {showTemplateSelector && (
           <div className="template-selector">
-            <h3>テンプレートを選択</h3>
+            <h3>議事録の基本形式を選択</h3>
+            <p>会議内容に合わせて、議題・項目・分量を柔軟に調整します。</p>
             <div className="template-grid">
               {templates.map((t) => (
                 <button
@@ -363,7 +368,7 @@ export function NewMeeting({
                   <strong>{t.name}</strong>
                   <p>{t.description}</p>
                   <span className="template-type">
-                    {t.templateType === "standard" ? "標準" : t.templateType === "brief" ? "簡易" : "詳細"}
+                    {minutesFormat(t.templateType).label}
                   </span>
                 </button>
               ))}
@@ -373,8 +378,8 @@ export function NewMeeting({
                 onClick={() => setShowTemplateSelector(false)}
               >
                 <LayoutTemplate size={24} />
-                <strong>テンプレートなし</strong>
-                <p>空白から会議を作成</p>
+                <strong>このまま進む</strong>
+                <p>{minutesFormat(template).label}で作成（後で変更できます）</p>
               </button>
             </div>
           </div>
@@ -771,17 +776,7 @@ export function NewMeeting({
               required
             />
           </label>
-          <label className="field">
-            議事録の詳しさ
-            <select
-              value={template}
-              onChange={(e) => setTemplate(e.target.value)}
-            >
-              <option value="standard">標準</option>
-              <option value="brief">要点を簡潔に</option>
-              <option value="detailed">背景も詳しく</option>
-            </select>
-          </label>
+          <MinutesFormatField value={template} onChange={setTemplate} disabled={busy} />
           <label className="field full">
             参加者 <span className="optional">任意</span>
             <input

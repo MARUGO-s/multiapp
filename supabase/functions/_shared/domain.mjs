@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { minutesFormat } from "./minutes-formats.mjs";
 
 export const MAX_FILE_SIZE = 24 * 1000 * 1000;
 export const MAX_TEXT_LENGTH = 100_000;
@@ -31,13 +32,17 @@ export const MetadataSchema = z.object({
 });
 
 // Omitted options preserve the saved depth for older clients and error retries.
-export const RetrySchema = z.object({
-  template: MetadataSchema.shape.template.removeDefault().optional(),
-}).strict();
+export const RetrySchema = z
+  .object({
+    template: MetadataSchema.shape.template.removeDefault().optional(),
+  })
+  .strict();
 
 // Tag names are the persisted identity; there is no separate tag-ID registry.
 export const TagNameSchema = z.string().trim().min(1).max(50);
-export const MeetingTagsSchema = z.array(TagNameSchema).max(50)
+export const MeetingTagsSchema = z
+  .array(TagNameSchema)
+  .max(50)
   .transform((names) => [...new Set(names)]);
 
 export const PatchSchema = z
@@ -90,47 +95,71 @@ export function minutesToMarkdown(meeting, minutes) {
     `日時：${meeting.date}`,
     `参加者：${meeting.participants || "未記入"}`,
     "",
-    "## サマリー",
+    `議事録形式：${minutesFormat(meeting.template).label}`,
+    "",
+    "## 内容要旨",
     "",
     minutes.summary,
   ];
-  for (const topic of minutes.topics) {
+  if (minutes.decisions.length) {
     lines.push(
       "",
-      `## ${topic.title}`,
+      "## 決定事項",
+      "",
+      ...minutes.decisions.map((d) => `- ${d}`),
+    );
+  }
+  const nextMeetings = minutes.topics.filter(
+    (topic) => topic.title.trim() === "次回会議",
+  );
+  const topics = minutes.topics.filter(
+    (topic) => topic.title.trim() !== "次回会議",
+  );
+  if (topics.length) lines.push("", "## 議事内容");
+  for (const topic of topics) {
+    lines.push(
+      "",
+      `### ${topic.title}`,
       "",
       ...topic.points.map((p) => `- ${p}`),
     );
   }
-  lines.push(
-    "",
-    "## 決定事項",
-    "",
-    ...(minutes.decisions.length
-      ? minutes.decisions.map((d) => `- ${d}`)
-      : ["決定事項の記録はありません。"]),
-  );
-  lines.push(
-    "",
-    "## アクションアイテム",
-    "",
-    ...(minutes.actions.length
-      ? minutes.actions.map(
-          (a) =>
-            `- [ ] ${a.task}（担当：${a.owner || "未定"} / 期限：${
-              a.due || "未定"
-            }）`,
-        )
-      : ["アクションの記録はありません。"]),
-  );
-  lines.push(
-    "",
-    "## 継続検討・確認事項",
-    "",
-    ...(minutes.openQuestions.length
-      ? minutes.openQuestions.map((q) => `- ${q}`)
-      : ["確認事項の記録はありません。"]),
-  );
+  if (minutes.actions.length) {
+    const cell = (value) =>
+      value
+        .replace(/\\/g, "\\\\")
+        .replace(/\|/g, "\\|")
+        .replace(/[\r\n]+/g, " ");
+    lines.push(
+      "",
+      "## 次の対応",
+      "",
+      "| 対応内容 | 担当 | 期限・時期 |",
+      "| --- | --- | --- |",
+      ...minutes.actions.map(
+        (a) =>
+          `| ${cell(a.task)} | ${cell(a.owner || "未定")} | ${cell(a.due || "未定")} |`,
+      ),
+    );
+  }
+  if (minutes.openQuestions.length) {
+    lines.push(
+      "",
+      "## 継続検討・確認事項",
+      "",
+      ...minutes.openQuestions.map((q) => `- ${q}`),
+    );
+  }
+  if (nextMeetings.length) {
+    lines.push(
+      "",
+      "## 次回会議",
+      "",
+      ...nextMeetings.flatMap((topic) =>
+        topic.points.map((point) => `- ${point}`),
+      ),
+    );
+  }
   if (minutes.documentReview?.length) {
     lines.push("", "## 添付資料との照合", "");
     for (const review of minutes.documentReview) {

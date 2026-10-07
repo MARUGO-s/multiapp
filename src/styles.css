@@ -2003,6 +2003,47 @@ button {
 .markdown p {
   white-space: pre-wrap;
 }
+.markdown h2 {
+  border-left: 3px solid var(--purple);
+  padding-left: 12px;
+}
+.minutes-table-wrap {
+  overflow-x: auto;
+  margin: 12px 0 24px;
+}
+.minutes-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  table-layout: fixed;
+  font-size: 0.95em;
+}
+.minutes-table th,
+.minutes-table td {
+  padding: 11px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.minutes-table th {
+  color: #fff;
+  background: #6555b4;
+  font-weight: 600;
+}
+.minutes-table th:first-child { width: 50%; }
+.minutes-table tbody tr:nth-child(even) { background: #f8f7fb; }
+@media (max-width: 600px) {
+  .minutes-table th,
+  .minutes-table td { padding: 8px 6px; }
+}
+@media print {
+  .minutes-table-wrap { overflow: visible; }
+  .minutes-table { font-size: 9pt; }
+  .minutes-table thead { display: table-header-group; }
+  .minutes-table tr { break-inside: avoid; }
+  .minutes-table th { color: #222; background: #f4f2fa; }
+}
 .md-list {
   display: flex;
   gap: 9px;

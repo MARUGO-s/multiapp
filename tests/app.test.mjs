@@ -34,7 +34,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
       async summarize(meeting) {
         seen.push(meeting.template);
         assert.equal(meeting.transcript, "保存済みの会話");
-        assert.match(summaryInput(meeting)[0].content, meeting.template === "detailed" ? /背景、理由、異論も詳しく/ : /要点を簡潔に/);
+        assert.match(summaryInput(meeting)[0].content, { detailed: /背景、理由、異論も詳しく/, brief: /要点を簡潔に/, standard: /要点を適度に詳しく/ }[meeting.template]);
         return { ...sampleMinutes, summary: `再生成：${meeting.template}` };
       },
     }),
@@ -42,7 +42,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
   const meeting = { ...createDemo(), isDemo: false, source: "audio", audioFile: "already.wav", transcript: "保存済みの会話", tags: ["既存タグ"], completedActions: [0] };
   await store.save(meeting);
   const route = `/meetings/${meeting.id}/retry`;
-  for (const body of [JSON.stringify({template: "detailed"}), JSON.stringify({template: "brief"}), undefined]) {
+  for (const body of [JSON.stringify({template: "detailed"}), JSON.stringify({template: "standard"}), JSON.stringify({template: "brief"}), undefined]) {
     const response = await request(route, { method: "POST", body });
     assert.equal(response.status, 202);
     await waitForJobs();
@@ -52,7 +52,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
     assert.deepEqual(saved.tags, ["既存タグ"]);
     assert.deepEqual(saved.completedActions, []);
   }
-  assert.deepEqual(seen, ["detailed", "brief", "brief"]);
+  assert.deepEqual(seen, ["detailed", "standard", "brief", "brief"]);
   assert.equal(transcriptions, 0);
   const reloaded = new MeetingStore(path.join(dataDir, "meetings"));
   await reloaded.init();
@@ -62,7 +62,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
     assert.equal((await request(route, { method: "POST", body })).status, 400);
     assert.deepEqual(store.get(meeting.id), before);
   }
-  assert.equal(seen.length, 3);
+  assert.equal(seen.length, 4);
 });
 
 test("会議一覧と詳細で分割録音の合計時間を返し、内部音声情報は公開しない", async (t) => {

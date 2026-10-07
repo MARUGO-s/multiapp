@@ -31,6 +31,9 @@ import {
   type Meeting,
 } from "./types";
 import { Modal } from "./Modal";
+import { MinutesFormatField } from "./MinutesFormatField";
+import { MinutesMarkdown as Markdown } from "./MinutesMarkdown.mjs";
+import { minutesFormat } from "../supabase/functions/_shared/minutes-formats.mjs";
 import { AttachmentPanel } from "./Attachments";
 import { MeetingSchedule } from "./Calendar";
 import {
@@ -48,55 +51,6 @@ const tabLabels: Record<Tab, string> = {
 };
 const hasFiles = (event: { dataTransfer: DataTransfer }) =>
   event.dataTransfer.types.includes("Files");
-
-function Markdown({ content, title }: { content: string; title: string }) {
-  return (
-    <div className="markdown">
-      {content.split("\n").map((line, i, lines) => {
-        // The page heading already shows the title, date and participants;
-        // keep the generated header lines for print only.
-        const header =
-          lines[0] === `# ${title}` &&
-          i < 4 &&
-          (i === 0 || /^(日時|参加者)：/.test(line));
-        if (header && i === 0)
-          return (
-            <h1 key={i} className="print-only">
-              {line.slice(2)}
-            </h1>
-          );
-        if (header)
-          return (
-            <p key={i} className="print-only">
-              {line}
-            </p>
-          );
-        if (line.startsWith("# ")) return <h1 key={i}>{line.slice(2)}</h1>;
-        if (line.startsWith("## ")) return <h2 key={i}>{line.slice(3)}</h2>;
-        if (line.startsWith("### ")) return <h3 key={i}>{line.slice(4)}</h3>;
-        if (/^- \[[ x]\] /.test(line))
-          return (
-            <p className="md-list" key={i}>
-              <span>{line.startsWith("- [x]") ? "☑" : "☐"}</span>
-              {line.slice(6)}
-            </p>
-          );
-        if (line.startsWith("- "))
-          return (
-            <p className="md-list" key={i}>
-              <span>•</span>
-              {line.slice(2)}
-            </p>
-          );
-        return line.trim() ? (
-          <p key={i}>{line}</p>
-        ) : (
-          <div className="md-space" key={i} />
-        );
-      })}
-    </div>
-  );
-}
 
 export function ActionList({
   meeting,
@@ -905,7 +859,7 @@ export function MeetingDetail({
           <div className="rail-models">
             <p>
               <span>議事録の詳しさ（解析設定）</span>
-              {{ standard: "標準", brief: "要点を簡潔に", detailed: "背景も詳しく" }[m.template]}
+              {minutesFormat(m.template).label}
             </p>
             <p>
               <span>解析モデル</span>
@@ -963,19 +917,7 @@ export function MeetingDetail({
           locked={busy}
         >
           {confirm === "regenerate" && (
-            <label className="field">
-              議事録の詳しさ
-              <select
-                value={retryTemplate}
-                onChange={(event) => setRetryTemplate(event.target.value as Meeting["template"])}
-                disabled={busy}
-              >
-                <option value="standard">標準</option>
-                <option value="brief">要点を簡潔に</option>
-                <option value="detailed">背景も詳しく</option>
-              </select>
-              <small>詳しくする場合も、会話に含まれる背景・理由・異論を整理します。会話にない内容は補いません。</small>
-            </label>
+            <MinutesFormatField value={retryTemplate} onChange={setRetryTemplate} disabled={busy} />
           )}
           <p className="confirm-copy">
             {confirm === "delete"
