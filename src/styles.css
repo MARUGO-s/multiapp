@@ -1965,6 +1965,42 @@ button {
   gap: 8px;
   padding-top: 24px;
 }
+.minutes-format-switcher {
+  margin: 20px 0 16px;
+}
+.minutes-format-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  max-width: 420px;
+  border-radius: 12px;
+  background: var(--purple-light, #f2effb);
+}
+.minutes-format-tabs button {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 9px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.minutes-format-tabs button.active {
+  background: #fff;
+  color: var(--purple);
+  font-weight: 600;
+  box-shadow: 0 1px 5px #29204415;
+}
+.minutes-format-tabs button:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 1px;
+}
+.minutes-format-tabs button:disabled { opacity: .45; }
+.minutes-format-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
 .button.ghost {
   background: transparent;
   border: 1px solid #e2e3eb;
@@ -3359,6 +3395,7 @@ button {
   .sample-note,
   .document-toolbar,
   .document-tabs,
+  .minutes-format-switcher,
   .toast,
   .progress-panel,
   .error-message,

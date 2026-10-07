@@ -50,6 +50,7 @@ export const PatchSchema = z
     title: z.string().trim().min(1).max(160).optional(),
     tags: MeetingTagsSchema.optional(),
     markdown: z.string().max(150_000).optional(),
+    markdownFormat: MetadataSchema.shape.template.removeDefault().optional(),
     transcript: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     completedActions: z
       .array(z.number().int().nonnegative())
@@ -59,12 +60,63 @@ export const PatchSchema = z
       .record(z.string().max(100), z.string().trim().min(1).max(100))
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((patch) => patch.markdownFormat === undefined || patch.markdown !== undefined, {
+    message: "編集する本文を指定してください。",
+  });
 
 export function renameMarkdownHeading(markdown, previousTitle, nextTitle) {
   const heading = /^# ([^\r\n]+)(\r?\n|$)/.exec(markdown);
   if (!heading || heading[1] !== previousTitle) return markdown;
   return `# ${nextTitle}${markdown.slice(heading[0].length - heading[2].length)}`;
+}
+
+export function minutesForFormat(minutes, format) {
+  const narrative = minutes?.formats?.[format];
+  return narrative ? { ...minutes, ...narrative } : minutes;
+}
+
+export function minutesDocuments(meeting, minutes) {
+  const markdownByFormat = minutes.formats
+    ? Object.fromEntries(Object.keys(minutes.formats).map((format) => [
+        format,
+        minutesToMarkdown({ ...meeting, template: format }, minutesForFormat(minutes, format)),
+      ]))
+    : null;
+  return {
+    markdown: markdownByFormat?.[meeting.template] ?? minutesToMarkdown(meeting, minutes),
+    markdownByFormat,
+  };
+}
+
+// Browser input may select only one saved view, never replace the whole bundle.
+// Old clients without markdownFormat still edit the meeting's initial view.
+export function minutesMarkdownPatch(meeting, patch) {
+  const { markdownFormat, ...result } = patch;
+  const selected = markdownFormat ?? meeting.template;
+  if (markdownFormat !== undefined &&
+      !Object.hasOwn(meeting.markdownByFormat || {}, markdownFormat)) {
+    throw Object.assign(new Error("Missing minutes format"), {
+      status: 400,
+      publicMessage: "この形式はまだ作成されていません。3形式を再生成してください。",
+    });
+  }
+  if (meeting.markdownByFormat) {
+    const documents = { ...meeting.markdownByFormat };
+    if (patch.title !== undefined) {
+      for (const format of Object.keys(documents)) {
+        documents[format] = renameMarkdownHeading(documents[format], meeting.title, patch.title);
+      }
+    }
+    if (patch.markdown !== undefined) documents[selected] = patch.markdown;
+    if (patch.title !== undefined || patch.markdown !== undefined) {
+      result.markdownByFormat = documents;
+      result.markdown = documents[meeting.template];
+    }
+  } else if (patch.title !== undefined && patch.markdown === undefined) {
+    result.markdown = renameMarkdownHeading(meeting.markdown, meeting.title, patch.title);
+  }
+  return result;
 }
 
 export function timecode(seconds) {

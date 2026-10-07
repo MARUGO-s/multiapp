@@ -15,7 +15,7 @@ export function MinutesFormatField({
 }) {
   return (
     <label className="field">
-      議事録の形式・詳しさ
+      最初に表示する形式
       <select
         value={value}
         onChange={(event) =>
@@ -31,7 +31,7 @@ export function MinutesFormatField({
       </select>
       <small>{minutesFormat(value).description}</small>
       <small>
-        会議内容に応じて項目と分量を調整します。ページ数は固定せず、会話にない内容は補いません。
+        要約・標準・詳細の3形式をまとめて作成します。作成後はタブで切り替えられます。切り替え時の追加AI課金はありません。
       </small>
     </label>
   );

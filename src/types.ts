@@ -6,6 +6,10 @@ export interface Action {
   category?: string;
 }
 export interface Minutes {
+  formats?: Record<Meeting["template"], {
+    summary: string;
+    topics: { title: string; points: string[] }[];
+  }>;
   scheduleEvents?: ScheduleEvent[];
   summary: string;
   topics: { title: string; points: string[] }[];
@@ -64,6 +68,7 @@ export interface Meeting {
   duration: number | null;
   transcript: string;
   markdown: string;
+  markdownByFormat?: Record<Meeting["template"], string> | null;
   minutes: Minutes | null;
   segments: {
     speaker: string;

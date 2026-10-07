@@ -354,8 +354,8 @@ export function NewMeeting({
       <form onSubmit={submit}>
         {showTemplateSelector && (
           <div className="template-selector">
-            <h3>議事録の基本形式を選択</h3>
-            <p>会議内容に合わせて、議題・項目・分量を柔軟に調整します。</p>
+            <h3>最初に表示する形式を選択</h3>
+            <p>要約・標準・詳細をまとめて作成します。会議内容に合わせて項目と分量を調整し、作成後はタブで切り替えられます。</p>
             <div className="template-grid">
               {templates.map((t) => (
                 <button
@@ -379,7 +379,7 @@ export function NewMeeting({
               >
                 <LayoutTemplate size={24} />
                 <strong>このまま進む</strong>
-                <p>{minutesFormat(template).label}で作成（後で変更できます）</p>
+                <p>3形式を作成し、最初に{minutesFormat(template).label}を表示</p>
               </button>
             </div>
           </div>
@@ -683,7 +683,7 @@ export function NewMeeting({
               )}
             </label>
             <p className="field-hint">
-              下の会議名・開催日・参加者・詳しさで議事録を作成します。Botの状況は会議の画面に表示されます（待機中 → 参加中 → 録音中 → アップロード中 → 議事録作成中 → 完了）。
+              下の会議名・開催日・参加者で3形式の議事録を作成します。Botの状況は会議の画面に表示されます（待機中 → 参加中 → 録音中 → アップロード中 → 議事録作成中 → 完了）。
             </p>
           </div>
         )}
