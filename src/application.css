@@ -4,6 +4,27 @@
   border: 0;
   min-width: 0;
 }
+.application-options.compact {
+  margin-bottom: 20px;
+}
+.application-options.compact .application-option {
+  padding: 13px 14px;
+  margin-bottom: 8px;
+}
+.login-secondary {
+  margin: 22px 0 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.login-secondary summary {
+  color: var(--purple);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+.login-secondary .qr-account-access {
+  margin-top: 18px;
+}
 .application-options legend {
   font-size: 14px;
   font-weight: 600;
