@@ -63,6 +63,7 @@ import { TagSuggestionDialog } from "./TagSuggestionDialog";
 import { createTagCompletionTracker, createTagSuggestionCache } from "./tag-suggestions.mjs";
 import { meetingEvents, tokyoToday } from "../supabase/functions/_shared/calendar.mjs";
 import { MeetingTagsSchema, TagNameSchema } from "../supabase/functions/_shared/domain.mjs";
+import { defaultMinutesTemplates } from "../supabase/functions/_shared/minutes-formats.mjs";
 import { BOT_PHASE_LABELS, botActive, botPhase } from "../supabase/functions/_shared/bot.mjs";
 
 const TAG_CANDIDATES_KEY = "kotonoha.tag-candidates.v1";
@@ -149,36 +150,7 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
 
   // デフォルトテンプレート
   useEffect(() => {
-    const defaultTemplates: MeetingTemplate[] = [
-      {
-        id: "weekly",
-        name: "週次定例会議",
-        description: "会議名と標準形式を設定します。議題は会話から抽出します。",
-        defaultParticipants: "",
-        defaultTopics: ["前回の振り返り", "今週の進捗", "課題・懸念事項", "来週の予定"],
-        templateType: "standard",
-        isDefault: true,
-      },
-      {
-        id: "project",
-        name: "プロジェクト進捗",
-        description: "会議名と詳細形式を設定します。議題は会話から抽出します。",
-        defaultParticipants: "",
-        defaultTopics: ["マイルストーンの進捗", "リスク管理", "リソース状況", "次回のアクション"],
-        templateType: "detailed",
-        isDefault: true,
-      },
-      {
-        id: "brainstorm",
-        name: "ブレインストーミング",
-        description: "会議名と簡易形式を設定します。議題は会話から抽出します。",
-        defaultParticipants: "",
-        defaultTopics: ["テーマの共有", "アイデア出し", "アイデアの整理", "次のステップ"],
-        templateType: "brief",
-        isDefault: true,
-      },
-    ];
-    setTemplates(defaultTemplates);
+    setTemplates(defaultMinutesTemplates() as MeetingTemplate[]);
   }, []);
 
   // 通知権限のチェック
@@ -1729,7 +1701,7 @@ function Help({
         <div>
           <h3>集計・タグ・通知について</h3>
           <p>API使用料は、文字起こし・議事録生成・タグ候補生成までを同じ解析ブロックに合算します。再解析は別ブロックです。既存のタグ履歴の紐付けは会議と処理順から推定し、元の料金と月合計は変更しません。</p>
-          <p>作成後は会議詳細の「詳しさを変えて再生成」で、標準／要点を簡潔に／背景も詳しくを選べます。保存済みの文字起こしを再利用します（未完了の音声は文字起こしを実行）。編集済み本文とアクションの完了状態は上書きされます。既存タグと予定の手動変更は保持します。キャンセル時は変更しません。</p>
+          <p>基本形式は要約版／標準版／詳細版（背景も詳しく）です。会議内容に応じて項目と分量を調整し、ページ数は固定しません。作成後は会議詳細の「詳しさを変えて再生成」でも形式を選べます。保存済みの文字起こしを再利用します（未完了の音声は文字起こしを実行）。編集済み本文とアクションの完了状態は上書きされます。既存タグと予定の手動変更は保持します。キャンセル時は変更しません。</p>
           <p>
             時間比較・総録音時間は分割音声の時間を合計します。時間が不明な会議は「未取得」と表示し、平均・合計から除外します。既存の会議も再解析せず反映されます。
           </p>
