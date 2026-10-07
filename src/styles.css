@@ -1447,6 +1447,72 @@ button {
   gap: 17px;
   margin-top: 23px;
 }
+.new-meeting-form .drop-zone {
+  padding: 14px 12px;
+  gap: 8px;
+}
+.file-format-help {
+  font-size: 12px;
+  color: #62687a;
+  text-align: center;
+  line-height: 1.7;
+}
+.file-format-help summary,
+.new-meeting-options summary {
+  cursor: pointer;
+}
+.file-format-help p {
+  margin-top: 6px;
+}
+.new-meeting-basics {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  margin-top: 18px;
+  gap: 14px;
+}
+.new-meeting-basics .field,
+.new-meeting-basics input {
+  min-width: 0;
+}
+.new-meeting-options {
+  margin-top: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: #53596b;
+}
+.new-meeting-options summary .optional {
+  position: static;
+  margin-left: 6px;
+}
+.new-meeting-options[open] > summary {
+  margin-bottom: 16px;
+}
+.new-meeting-options > .field {
+  margin-bottom: 14px;
+}
+.new-meeting-options > .field-hint {
+  margin-top: 14px;
+}
+.new-meeting-form .processing-note {
+  font-size: 12px;
+  margin-top: 14px;
+  line-height: 1.7;
+}
+.new-meeting-form .modal-footer {
+  margin-top: 8px;
+  padding: 12px 0;
+  border-top: 0;
+}
+.new-meeting-form .modal-footer .primary {
+  width: 100%;
+  justify-content: center;
+}
+@media (max-width: 640px) {
+  .new-meeting-basics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .field {
   display: flex;
   flex-direction: column;

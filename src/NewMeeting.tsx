@@ -4,7 +4,6 @@ import {
   ArrowUp,
   ArrowDown,
   Bot,
-  Check,
   FileAudio,
   FileText,
   LoaderCircle,
@@ -15,11 +14,9 @@ import {
   Square,
   UploadCloud,
   X,
-  LayoutTemplate,
 } from "lucide-react";
 import { Modal } from "./Modal";
-import { MinutesFormatField } from "./MinutesFormatField";
-import { isMinutesFormatTemplate, minutesFormat } from "../supabase/functions/_shared/minutes-formats.mjs";
+import { isMinutesFormatTemplate } from "../supabase/functions/_shared/minutes-formats.mjs";
 import { isCloud } from "./cloud";
 import { normalizeMeetUrl } from "../supabase/functions/_shared/bot.mjs";
 import { AttachmentPicker } from "./Attachments";
@@ -74,21 +71,27 @@ export function NewMeeting({
   onSettings: () => void;
   onBot: (request: {
     meetUrl: string;
-    metadata: { title: string; date: string; participants: string; template: string };
+    metadata: {
+      title: string;
+      date: string;
+      participants: string;
+      template: string;
+    };
   }) => Promise<void>;
   templates: MeetingTemplate[];
 }) {
   const [mode, setMode] = useState<"record" | "file" | "text" | "bot">("file");
   const [meetUrl, setMeetUrl] = useState("");
   const meetUrlValid = normalizeMeetUrl(meetUrl) !== null;
-  const [showTemplateSelector, setShowTemplateSelector] = useState(templates.length > 0);
-  const [selectedTemplate, setSelectedTemplate] = useState<MeetingTemplate | null>(null);
+  const customTemplates = templates.filter((t) => !isMinutesFormatTemplate(t));
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [participants, setParticipants] = useState("");
-  const [template, setTemplate] = useState<"standard" | "brief" | "detailed">("detailed");
+  // All three formats are generated; new meetings always open the standard view.
+  const template = "standard";
   const [transcript, setTranscript] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -222,14 +225,13 @@ export function NewMeeting({
     setRecoverable((current) => current.filter((s) => s.id !== id));
   }
 
-  function applyTemplate(t: MeetingTemplate) {
-    setSelectedTemplate(t);
-    if (!isMinutesFormatTemplate(t)) {
+  function applyTemplate(id: string) {
+    setSelectedTemplateId(id);
+    const t = customTemplates.find((item) => item.id === id);
+    if (t) {
       setTitle(t.name);
       setParticipants(t.defaultParticipants);
     }
-    setTemplate(t.templateType);
-    setShowTemplateSelector(false);
   }
 
   async function chooseFiles(selected: FileList | File[] | null) {
@@ -316,7 +318,10 @@ export function NewMeeting({
             "Google MeetのURL（https://meet.google.com/xxx-xxxx-xxx）を入力してください。",
           );
         setProgress("Botに参加を依頼しています…");
-        await onBot({ meetUrl: url, metadata: { title, date, participants, template } });
+        await onBot({
+          meetUrl: url,
+          metadata: { title, date, participants, template },
+        });
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -342,8 +347,8 @@ export function NewMeeting({
   }
   return (
     <Modal
-      title="録音から議事録を作成"
-      subtitle="分かれた録音も、順番につないで1つの議事録に。"
+      title="議事録を作成"
+      subtitle="要約・標準・詳細の3形式を自動で作成します。"
       onClose={() => {
         if (recorderRef.current) cancelRec();
         onClose();
@@ -351,39 +356,7 @@ export function NewMeeting({
       locked={busy}
       wide
     >
-      <form onSubmit={submit}>
-        {showTemplateSelector && (
-          <div className="template-selector">
-            <h3>最初に表示する形式を選択</h3>
-            <p>要約・標準・詳細をまとめて作成します。会議内容に合わせて項目と分量を調整し、作成後はタブで切り替えられます。</p>
-            <div className="template-grid">
-              {templates.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`template-card ${selectedTemplate?.id === t.id ? "selected" : ""}`}
-                  onClick={() => applyTemplate(t)}
-                >
-                  <LayoutTemplate size={24} />
-                  <strong>{t.name}</strong>
-                  <p>{t.description}</p>
-                  <span className="template-type">
-                    {minutesFormat(t.templateType).label}
-                  </span>
-                </button>
-              ))}
-              <button
-                type="button"
-                className="template-card template-skip"
-                onClick={() => setShowTemplateSelector(false)}
-              >
-                <LayoutTemplate size={24} />
-                <strong>このまま進む</strong>
-                <p>3形式を作成し、最初に{minutesFormat(template).label}を表示</p>
-              </button>
-            </div>
-          </div>
-        )}
+      <form onSubmit={submit} className="new-meeting-form">
         {recoverable.length > 0 && (
           <div className="notice">
             前回中断した録音があります（
@@ -412,9 +385,9 @@ export function NewMeeting({
         <div className="input-tabs">
           {(
             [
-              ["record", Mic, "その場で録音"],
               ["file", UploadCloud, "録音ファイル"],
-              ["text", FileText, "文字起こし済みテキスト"],
+              ["record", Mic, "その場で録音"],
+              ["text", FileText, "テキスト"],
               ...(isCloud ? ([["bot", Bot, "Botを呼ぶ"]] as const) : []),
             ] as const
           ).map(([id, Icon, label]) => (
@@ -600,9 +573,7 @@ export function NewMeeting({
               if (!busy && !preparing) void chooseFiles(e.dataTransfer.files);
             }}
           >
-            <UploadCloud size={32} />
             <strong>録音ファイルをここにドロップ</strong>
-            <span>または</span>
             <button
               type="button"
               className="button secondary small"
@@ -619,13 +590,21 @@ export function NewMeeting({
                 "ファイルを選択"
               )}
             </button>
-            <small>音声：AAC / MP3 / M4A / WAV / OGG / FLAC</small>
             <small>
-              動画：MP4 / MOV / MKV / WebM / MTS / M2TS / TS /
-              3GP（音声だけを取り出して使用）
+              音声・動画を最大5ファイル。分かれた録音もまとめられます。
             </small>
-            <small>合計100 MBを超える場合は、音声を自動で圧縮します</small>
-            <small>最大5ファイル・合計100 MBまで · 大きな録音は自動分割</small>
+            <details className="file-format-help">
+              <summary>対応形式・サイズについて</summary>
+              <p>音声：AAC / MP3 / M4A / WAV / OGG / FLAC / MPEG / MPGA</p>
+              <p>
+                動画：MP4 / M4V / MOV / MKV / WebM / MTS / M2TS / TS /
+                3GP（音声のみ使用）
+              </p>
+              <p>
+                合計100
+                MBまで。超える場合は音声を自動圧縮し、大きな録音は自動分割します。
+              </p>
+            </details>
             <input
               ref={input}
               type="file"
@@ -674,7 +653,8 @@ export function NewMeeting({
               />
               {meetUrl !== "" && !meetUrlValid ? (
                 <span className="field-hint bot-url-error">
-                  https://meet.google.com/xxx-xxxx-xxx の形式で入力してください。
+                  https://meet.google.com/xxx-xxxx-xxx
+                  の形式で入力してください。
                 </span>
               ) : (
                 <span className="field-hint">
@@ -683,7 +663,8 @@ export function NewMeeting({
               )}
             </label>
             <p className="field-hint">
-              下の会議名・開催日・参加者で3形式の議事録を作成します。Botの状況は会議の画面に表示されます（待機中 → 参加中 → 録音中 → アップロード中 → 議事録作成中 → 完了）。
+              下の会議名・開催日・参加者で3形式の議事録を作成します。Botの状況は会議の画面に表示されます（待機中
+              → 参加中 → 録音中 → アップロード中 → 議事録作成中 → 完了）。
             </p>
           </div>
         )}
@@ -749,15 +730,8 @@ export function NewMeeting({
             </p>
           </div>
         )}
-        {mode !== "bot" && (
-          <AttachmentPicker
-            files={attachments}
-            onChange={setAttachments}
-            disabled={busy}
-          />
-        )}
-        <div className="form-grid">
-          <label className="field full">
+        <div className="form-grid new-meeting-basics">
+          <label className="field">
             会議名
             <input
               value={title}
@@ -765,6 +739,7 @@ export function NewMeeting({
               maxLength={160}
               placeholder="例：新サービスのリリース定例"
               required
+              disabled={busy}
             />
           </label>
           <label className="field">
@@ -774,28 +749,62 @@ export function NewMeeting({
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
+              disabled={busy}
             />
           </label>
-          <MinutesFormatField value={template} onChange={setTemplate} disabled={busy} />
-          <label className="field full">
+        </div>
+        <details className="new-meeting-options">
+          <summary>
+            {mode === "bot" ? "参加者・その他の設定" : "参加者・添付資料など"}{" "}
+            <span className="optional">任意</span>
+          </summary>
+          {customTemplates.length > 0 && (
+            <label className="field">
+              保存した会議設定を使う
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => applyTemplate(e.target.value)}
+                disabled={busy}
+              >
+                <option value="">選択しない</option>
+                {customTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <small>
+                会議名・参加者を入力します。作成する形式は変わりません。
+              </small>
+            </label>
+          )}
+          <label className="field">
             参加者 <span className="optional">任意</span>
             <input
               value={participants}
               onChange={(e) => setParticipants(e.target.value)}
               maxLength={2000}
               placeholder="例：田中、佐藤、鈴木"
+              disabled={busy}
             />
           </label>
-        </div>
+          {mode !== "bot" && (
+            <AttachmentPicker
+              files={attachments}
+              onChange={setAttachments}
+              disabled={busy}
+            />
+          )}
+          <p className="field-hint">
+            解析モデル：{modelName(settings?.model)}
+            。完成後は標準版を表示し、タブで切り替えられます。
+          </p>
+        </details>
         <p className="processing-note">
-          <Check size={15} />
-          {mode !== "text"
-            ? `${transcriptionModelName(settings?.transcriptionModel)} → ${modelName(settings?.model)}`
-            : modelName(settings?.model)}
-          <br />
-          <span>
-            音声は選択した文字起こしサービスへ、テキストはOpenAIへ送信して処理します。添付資料は保存のみで、AIには送信しません。
-          </span>
+          {mode !== "text" &&
+            `音声は${transcriptionModelName(settings?.transcriptionModel)}へ、`}
+          文字起こしはOpenAIへ送信します。
+          {mode !== "bot" && "添付資料は保存のみで、AIには送信しません。"}
         </p>
         {!settings?.configured && (
           <div className="notice">
@@ -834,13 +843,7 @@ export function NewMeeting({
             {error}
           </div>
         )}
-        <p className="muted">議事録が完成すると、AIタグ候補を自動表示します。必要なタグだけを選んで保存できます。</p>
         <div className="modal-footer">
-          <span>
-            {mode === "bot"
-              ? "Botの録音は会議終了後に自動で取り込まれます"
-              : "取り込んだ音声はあとから再生できます"}
-          </span>
           <button
             className="button primary"
             disabled={
@@ -870,7 +873,7 @@ export function NewMeeting({
                 : "Botを呼ぶ"
               : busy
                 ? "取り込み中…"
-                : "解析して議事録を作成"}
+                : "議事録を作成"}
             <ArrowRight size={16} />
           </button>
         </div>
