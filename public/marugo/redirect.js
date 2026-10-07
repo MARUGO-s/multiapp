@@ -18,6 +18,34 @@ try {
 // was lost after committing. Do not put it in persistent/session storage:
 // opening the same printed QR again is a new access and should be counted.
 const eventId = crypto.randomUUID();
+// Separate, expiring IDs for each QR; never reuse Auth IDs or track across QRs.
+// Storage denial must not prevent forwarding or manufacture a unique visitor.
+function browserVisitorId() {
+  if (!/^[A-Za-z0-9_-]{12}$/.test(code)) return null;
+  try {
+    const key = `marugo-qr-visitor:v1:${code}`;
+    const now = Date.now();
+    const lifetime = 180 * 24 * 60 * 60 * 1000;
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
+    if (
+      saved &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        saved.id,
+      ) &&
+      Number.isFinite(saved.expiresAt) &&
+      saved.expiresAt > now &&
+      saved.expiresAt <= now + lifetime
+    )
+      return saved.id;
+    const value = { id: crypto.randomUUID(), expiresAt: now + lifetime };
+    const encoded = JSON.stringify(value);
+    localStorage.setItem(key, encoded);
+    return localStorage.getItem(key) === encoded ? value.id : null;
+  } catch {
+    return null;
+  }
+}
+const visitorId = browserVisitorId();
 const status = document.querySelector("#status");
 const retry = document.querySelector("#retry");
 const heading = document.querySelector("#heading");
@@ -40,7 +68,7 @@ export async function scan() {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, eventId, source, referrerHost }),
+      body: JSON.stringify({ code, eventId, source, referrerHost, visitorId }),
       signal: AbortSignal.timeout(15000),
       credentials: "omit",
       cache: "no-store",

@@ -40,7 +40,7 @@ globalThis.fetch = async (input, init: any) => {
   }
   if (name === "marugo_qr_accounts")
     return Response.json({ workspaceId: owner });
-  if (name === "kotonoha_qr_scan") {
+  if (name === "kotonoha_qr_scan_unique") {
     assert.equal(args.p_owner, undefined);
     if (suspended) {
       return Response.json({ message: "INACTIVE" }, { status: 400 });
@@ -412,6 +412,30 @@ Deno.test(
       );
       assert.equal(anonymous.status, 200);
       assert.equal(calls.at(-1)!.args.p_source, "unknown");
+      assert.equal(calls.at(-1)!.args.p_visitor_hash, null);
+      const visitorId = "00000000-0000-4000-8000-0000000000ab";
+      const identified = await handler(
+        request("/scan", "POST", { code: "abcdefgh1234", eventId, visitorId }),
+      );
+      assert.equal(identified.status, 200);
+      assert.equal(calls.at(-1)!.name, "kotonoha_qr_scan_unique");
+      assert.match(calls.at(-1)!.args.p_visitor_hash, /^[0-9a-f]{64}$/);
+      assert.equal(
+        JSON.stringify(calls.at(-1)!.args).includes(visitorId),
+        false,
+      );
+      const bot = await handler(
+        new Request("https://qr-test.invalid/functions/v1/marugo-qr/scan", {
+          method: "POST",
+          headers: {
+            "user-agent": "Googlebot Chrome/100",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ code: "abcdefgh1234", eventId, visitorId }),
+        }),
+      );
+      assert.equal(bot.status, 200);
+      assert.equal(calls.at(-1)!.args.p_visitor_hash, null);
       const attributed = await handler(
         new Request("https://qr-test.invalid/functions/v1/marugo-qr/scan", {
           method: "POST",
@@ -433,6 +457,9 @@ Deno.test(
       assert.equal(calls.at(-1)!.args.p_device, "mobile");
       assert.equal(calls.at(-1)!.args.p_browser, "safari");
       for (const extra of [
+        { visitorId: "not-a-uuid" },
+        { visitorId: { id: visitorId } },
+        { visitorId: "192.0.2.1" },
         { source: "admin" },
         {
           referrerHost: "https://example.com/private?token=secret",
