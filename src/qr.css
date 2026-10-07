@@ -190,6 +190,40 @@
   padding: 14px 18px;
   overflow-wrap: anywhere;
 }
+.qr-measurement-warning {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  background: #f8f9fc;
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+.qr-measurement-warning strong {
+  display: block;
+  color: var(--ink);
+}
+.qr-browser-reference {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 18px 0;
+}
+.qr-browser-reference summary {
+  cursor: pointer;
+  color: var(--purple);
+  font-size: 14px;
+  font-weight: 600;
+}
+.qr-reference-kpis > div {
+  background: #f8f9fc;
+}
+.qr-reference-kpis strong {
+  font-size: 24px;
+}
+.qr-reference-kpis strong.qr-reference-unavailable {
+  font-size: 16px;
+  color: var(--muted);
+}
 .qr-chart-scroll {
   overflow-x: auto;
   padding: 8px 0;
@@ -320,8 +354,12 @@
   overflow-wrap: anywhere;
 }
 .qr-breakdown li strong {
-  white-space: nowrap;
+  text-align: right;
   font-weight: 550;
+}
+.qr-breakdown-reference {
+  display: block;
+  margin-top: 4px;
 }
 .qr-breakdown li small {
   font-weight: 400;
