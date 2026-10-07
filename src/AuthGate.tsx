@@ -18,7 +18,6 @@ import {
 } from "./cloud";
 import { api } from "./api";
 import { ExternalApplications } from "./ExternalApplications";
-import { QrAccountAccess } from "./QrAccountAccess";
 import { PortalGoogleAccess } from "./PortalGoogleAccess";
 import { portalGoogleAuthEnabled, qrAuth } from "./qr-account-client";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
@@ -149,7 +148,7 @@ export function AuthGate({
       setBusy(false);
     }
   }
-  if (application && (application === "qr" || !isCloud || session))
+  if (application && (!isCloud || session))
     return (
       <>
         {children(application, () => {
@@ -196,13 +195,9 @@ export function AuthGate({
             <LockKeyhole size={25} />
           </span>
           <h2>このページで開く</h2>
-          <p>
-            {session
-              ? "会議録にログイン済みです。QRの利用権限は別途確認します。"
-              : "アプリを選んでログインしてください。QRは個人のメールアドレスで利用します。"}
-          </p>
-          <fieldset className="application-options" disabled={busy}>
-            <legend>利用するアプリ</legend>
+          <p>{session ? "ログイン済みです。開くアプリを選択してください。" : "共通のログインIDとパスワードで利用できます。"}</p>
+          <fieldset className="application-options compact" disabled={busy}>
+            <legend>開くアプリ</legend>
             {(
               [
                 {
@@ -245,71 +240,64 @@ export function AuthGate({
             ))}
           </fieldset>
           {portalGoogleAuthEnabled && isCloud && (
-            <PortalGoogleAccess
-              application={selectedApplication}
-              onOpen={() => setApplication("kotonoha")}
-              onBusy={setBusy}
-              onIdentity={setIdentity}
-            />
+            <details className="login-secondary">
+              <summary>Googleでログイン（補助）</summary>
+              <PortalGoogleAccess
+                application={selectedApplication}
+                onOpen={() => setApplication("kotonoha")}
+                onBusy={setBusy}
+                onIdentity={setIdentity}
+              />
+            </details>
           )}
-          {selectedApplication === "qr" ? (
-            <QrAccountAccess
-              onAuthenticated={() => setApplication("qr")}
-              onBusy={setBusy}
-              sharedGoogle={portalGoogleAuthEnabled}
-            />
-          ) : (
-            <form onSubmit={login}>
-              {isCloud && !session && (
-                <>
-                  <label className="field">
-                    ログインID
-                    <input
-                      type="text"
-                      autoComplete="username"
-                      value={loginId}
-                      onChange={(e) => setLoginId(e.target.value)}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      required
-                      placeholder="ログインIDを入力"
-                    />
-                  </label>
-                  <label className="field">
-                    パスワード
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </label>
-                </>
-              )}
-              {error && (
-                <div className="error-message" role="alert">
-                  {error}
-                </div>
-              )}
-              <button className="button primary" disabled={busy}>
-                {busy ? (
-                  <LoaderCircle size={17} className="spin" />
-                ) : (
-                  <ArrowRight size={17} />
-                )}
-                {busy
-                  ? "ログインしています…"
-                  : `kotonoha${session || !isCloud ? "を開く" : "にログイン"}`}
-              </button>
-              <div className="login-account-note">
-                <ShieldCheck size={17} />
-                <p>
-                  kotonohaはこれまでの共通IDも利用できます。Googleでの利用には本人連携と管理者承認が必要です。QRは個人アカウント・店舗別の管理です。共用端末では利用後にログアウトしてください。
-                </p>
+          <form onSubmit={login}>
+            {isCloud && !session && (
+              <>
+                <label className="field">
+                  ログインID
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    placeholder="ログインIDを入力"
+                  />
+                </label>
+                <label className="field">
+                  パスワード
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </label>
+              </>
+            )}
+            {error && (
+              <div className="error-message" role="alert">
+                {error}
               </div>
-            </form>
-          )}
+            )}
+            <button className="button primary" disabled={busy}>
+              {busy ? <LoaderCircle size={17} className="spin" /> : <ArrowRight size={17} />}
+              {busy
+                ? "ログインしています…"
+                : session || !isCloud
+                  ? `${selectedApplication === "qr" ? "MARUGO QR" : "kotonoha"}を開く`
+                  : "ログインして開く"}
+            </button>
+            <div className="login-account-note">
+              <ShieldCheck size={17} />
+              <p>
+                kotonohaとMARUGO QRは同じ共通IDでログインします。お披露目期間はQRの全店舗を利用できます。共用端末では利用後にログアウトしてください。
+              </p>
+            </div>
+          </form>
         </div>
       </section>
     </div>

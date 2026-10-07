@@ -1,4 +1,8 @@
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./cloud";
+import {
+  SUPABASE_PUBLISHABLE_KEY,
+  SUPABASE_URL,
+  getSession,
+} from "./cloud";
 import { buildTrackingUrl } from "./qr-routing.mjs";
 import { createContext, useContext, useMemo } from "react";
 import { qrAuth } from "./qr-account-client";
@@ -87,9 +91,16 @@ export async function qrApi<T>(
     data: { session },
     error,
   } = await qrAuth.auth.getSession();
-  if (error || !session || !scope || session.user.id !== scope.userId) {
+  const shared =
+    !session && !error && typeof getSession === "function"
+      ? getSession()
+      : null;
+  if (!scope || (!session && !shared))
+    throw new Error("ログインが必要です。");
+  if (session && session.user.id !== scope.userId)
     throw new Error("QR管理には所属店舗のアカウントでログインしてください。");
-  }
+  if (shared && !scope.userId) throw new Error("ログインが必要です。");
+  const token = session?.access_token || shared?.token;
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/marugo-qr${scopedQrPath(path, scope.storeId)}`,
     {
@@ -97,7 +108,7 @@ export async function qrApi<T>(
       headers: {
         "Content-Type": "application/json",
         apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${token}`,
       },
       signal: AbortSignal.timeout(15000),
     },
