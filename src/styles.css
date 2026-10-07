@@ -1713,33 +1713,53 @@ button {
   align-items: center;
   justify-content: space-between;
 }
-.provider-heading {
+.api-connections {
+  display: grid;
+  gap: 8px;
+}
+.api-connection {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.api-connection > summary {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin: 0 0 22px;
-}
-.provider-icon {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #f1edf9;
-  color: #a491c5;
-}
-.provider-heading strong {
-  font-size: 15px;
-  font-weight: 600;
-}
-.provider-heading small {
-  display: block;
+  gap: 10px;
+  padding: 13px 12px;
+  cursor: pointer;
+  list-style: none;
   color: #62687a;
-  font-size: 13px;
-  margin-top: 5px;
 }
-.provider-heading > svg {
+.api-connection > summary::-webkit-details-marker {
+  display: none;
+}
+.api-connection > summary strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.api-connection-status {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.api-connection-status.configured {
+  color: #36795e;
+}
+.api-connection-chevron {
+  flex-shrink: 0;
+}
+.api-connection[open] .api-connection-chevron {
+  transform: rotate(180deg);
+}
+.api-connection-body {
+  padding: 0 12px 14px;
+}
+.api-connection-body .field-hint {
+  font-size: 12px;
 }
 .fixed-model {
   display: flex;

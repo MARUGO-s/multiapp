@@ -1639,7 +1639,7 @@ function Help({
         {[
           {
             title: "AIの接続設定",
-            text: "OpenAIのAPIキーを設定し、議事録に使うGPT-6 Astra・Sol・Lunaを選択します。文字起こしはGPT TranscribeまたはGemini 3.5 Transcribeから選べます。Geminiを使う場合はGemini APIキーも設定してください。",
+            text: "OpenAIのAPIキーを設定し、議事録に使うGPT-6 Astra・Sol・Lunaを選択します。設定済みのキー欄と説明は折りたたまれ、変更するときだけ各APIの行を開きます。モデルだけ変える場合はキーの再入力は不要です。文字起こしはGPT TranscribeまたはGemini 3.5 Transcribeから選べます。未設定のGeminiを選ぶとキー入力欄が自動で開きます。",
             action: "接続設定を開く",
             run: onSettings,
           },
