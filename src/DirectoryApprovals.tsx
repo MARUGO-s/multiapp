@@ -167,7 +167,7 @@ export function DirectoryApprovals({
         各アプリで受け付けた申請を表示します。下の一覧から最大20件を選び、まとめて承認・承認取り消しできます。管理者の役割変更・アカウント削除は行いません。
       </p>
       <p className="dir-explainer">
-        検索条件に一致する、取得済みの対象だけを表示しています。レシピ・SNS・グルメ・LINE・M-talk・Journalは、この承認操作にはまだ対応していません。
+        検索条件に一致する、取得済みの対象だけを表示しています。グルメの承認・店舗指定・管理者任命・削除は「SNS・グルメ」欄のリンク先で行います。レシピ・SNS・LINE・M-talk・Journalは、この承認操作にはまだ対応していません。
       </p>
       <div className="dir-approval-toolbar">
         <strong>{chosen.length}件選択</strong>
