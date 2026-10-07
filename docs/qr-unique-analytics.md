@@ -21,7 +21,7 @@ Edgeは形式を検証し、`SHA-256(marugo-qr-visitor:v1:<QRコード>:<UUID小
 
 ## 変更範囲と反映順序
 
-1. `20261007090000_qr_unique_analytics.sql` の1件だけを適用する。共用DBの `db push` / `db reset` は使わない。
+1. `20261007103620_qr_unique_analytics.sql` の1件だけを適用する。共用DBの `db push` / `db reset` は使わない。ファイルのバージョンはMCPによる本番適用の履歴と一致させている。
 2. `marugo-qr` のみをデプロイ（`verify_jwt=false`：公開scan、管理APIは内部Auth/店舗権限検証）。
 3. PRをmainへマージしGitHub Pagesの成功と新しい `marugo/redirect.js` を確認する。
 
