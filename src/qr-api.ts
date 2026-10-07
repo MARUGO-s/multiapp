@@ -46,15 +46,26 @@ export type QrAnalyticsData = {
   days: number;
   startDate: string;
   endDate: string;
-  daily: { date: string; count: number }[];
+  daily: {
+    date: string;
+    count: number;
+    uniqueCount: number;
+    unknownCount: number;
+    botCount: number;
+  }[];
   periodTotal: number;
+  periodUnique: number;
+  totalUnique: number;
+  identifiedAccesses: number;
+  unknownAccesses: number;
+  botAccesses: number;
   total: number;
   generatedAt: string;
   source: string;
-  sources: { key: string; count: number }[];
-  devices: { key: string; count: number }[];
-  browsers: { key: string; count: number }[];
-  referrers: { key: string; count: number }[];
+  sources: { key: string; count: number; uniqueCount: number }[];
+  devices: { key: string; count: number; uniqueCount: number }[];
+  browsers: { key: string; count: number; uniqueCount: number }[];
+  referrers: { key: string; count: number; uniqueCount: number }[];
 };
 export function trackingUrl(
   code: string,

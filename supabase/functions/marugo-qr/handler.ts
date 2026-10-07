@@ -1,4 +1,5 @@
 import { AccountError, qrScope } from "../_shared/qr-account-auth.ts";
+import { validVisitorId, visitorHash } from "../_shared/qr-visitor.mjs";
 import {
   FileError,
   publicFile,
@@ -221,15 +222,20 @@ export async function handler(req: Request): Promise<Response> {
         throw new ApiError(400, "アクセス情報の形式が正しくありません。");
       }
       const agent = (req.headers.get("user-agent") || "").slice(0, 512);
-      const data = await rpc("kotonoha_qr_scan", {
+      if (!validVisitorId(input.visitorId)) {
+        throw new ApiError(400, "アクセス情報の形式が正しくありません。");
+      }
+      const device = accessDevice(agent);
+      const data = await rpc("kotonoha_qr_scan_unique", {
         p_code: input.code,
         p_event: input.eventId,
         p_source: source,
         p_referrer_host:
           typeof referrer === "string" ? referrer.toLowerCase() : null,
-        p_device: accessDevice(agent),
+        p_device: device,
         p_browser: accessBrowser(agent),
         p_user_agent: agent,
+        p_visitor_hash: await visitorHash(input.code, input.visitorId, device),
       });
       return json({ targetUrl: normalizeTarget(data.targetUrl) });
     }

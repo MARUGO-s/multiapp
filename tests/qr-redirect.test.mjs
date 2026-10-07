@@ -7,9 +7,21 @@ const source = readFileSync(
   new URL("../public/marugo/redirect.js", import.meta.url),
   "utf8",
 ).replace("export async function scan", "async function scan");
-async function setup(hash, responses, search = "", referrer = "") {
+async function setup(
+  hash,
+  responses,
+  search = "",
+  referrer = "",
+  options = {},
+) {
   const calls = [];
   const destinations = [];
+  const values = new Map();
+  const storage = options.storage ?? {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  let nextId = options.startId ?? 1;
   const elements = new Map(
     ["#status", "#retry", "#heading"].map((id) => [
       id,
@@ -19,7 +31,12 @@ async function setup(hash, responses, search = "", referrer = "") {
   const context = vm.createContext({
     location: { hash, search, replace: (url) => destinations.push(url) },
     document: { referrer, querySelector: (id) => elements.get(id) },
-    crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+    crypto: {
+      randomUUID: () =>
+        `00000000-0000-4000-8000-${String(nextId++).padStart(12, "0")}`,
+    },
+    localStorage: storage,
+    Date: { now: () => options.now ?? 1_790_000_000_000 },
     URL,
     URLSearchParams,
     AbortSignal,
@@ -36,7 +53,7 @@ async function setup(hash, responses, search = "", referrer = "") {
   });
   vm.runInContext(source, context);
   await new Promise((resolve) => setImmediate(resolve));
-  return { context, calls, destinations, elements };
+  return { context, calls, destinations, elements, storage };
 }
 test("Public QR: redirects only after recording and reuses event ID on a lost response", async () => {
   const state = await setup("#abcdefgh1234", [
@@ -100,5 +117,69 @@ test("Old URLs and invalid source markers stay unknown", async () => {
       query,
     );
     assert.equal(state.calls[0].source, "unknown");
+  }
+});
+test("Visitor ID survives repeat navigation but event IDs stay navigation-specific", async () => {
+  const ok = () => [
+    { status: 200, body: { targetUrl: "https://example.com/" } },
+  ];
+  const first = await setup("#abcdefgh1234", ok());
+  const second = await setup("#abcdefgh1234", ok(), "?s=b", "", {
+    storage: first.storage,
+    startId: 20,
+  });
+  assert.equal(first.calls[0].visitorId, second.calls[0].visitorId);
+  assert.notEqual(first.calls[0].eventId, second.calls[0].eventId);
+  assert.notEqual(first.calls[0].eventId, first.calls[0].visitorId);
+  const otherQr = await setup("#otherqr12345", ok(), "", "", {
+    storage: first.storage,
+    startId: 40,
+  });
+  assert.notEqual(first.calls[0].visitorId, otherQr.calls[0].visitorId);
+  const expired = await setup("#abcdefgh1234", ok(), "", "", {
+    storage: first.storage,
+    startId: 60,
+    now: 1_790_000_000_000 + 181 * 86400000,
+  });
+  assert.notEqual(first.calls[0].visitorId, expired.calls[0].visitorId);
+});
+test("Blocked/read-only storage forwards normally without inventing unique IDs", async () => {
+  for (const storage of [
+    {
+      getItem() {
+        throw new Error("blocked");
+      },
+      setItem() {},
+    },
+    {
+      getItem() {
+        return null;
+      },
+      setItem() {
+        throw new Error("quota");
+      },
+    },
+    {
+      getItem() {
+        return null;
+      },
+      setItem() {},
+    },
+    {
+      getItem() {
+        return "corrupt";
+      },
+      setItem() {},
+    },
+  ]) {
+    const state = await setup(
+      "#abcdefgh1234",
+      [{ status: 200, body: { targetUrl: "https://example.com/" } }],
+      "",
+      "",
+      { storage },
+    );
+    assert.equal(state.calls[0].visitorId, null);
+    assert.equal(state.destinations.length, 1);
   }
 });
