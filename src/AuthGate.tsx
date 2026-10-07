@@ -6,7 +6,6 @@ import {
   LockKeyhole,
   ShieldCheck,
   QrCode,
-  Check,
 } from "lucide-react";
 import {
   isCloud,
@@ -18,6 +17,7 @@ import {
 } from "./cloud";
 import { api } from "./api";
 import { ExternalApplications } from "./ExternalApplications";
+import { QrAccountAccess } from "./QrAccountAccess";
 import { PortalGoogleAccess } from "./PortalGoogleAccess";
 import { portalGoogleAuthEnabled, qrAuth } from "./qr-account-client";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
@@ -47,8 +47,11 @@ export function AuthGate({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [identity, setIdentity] = useState<string | null>(null);
+  const [otherLoginOpen, setOtherLoginOpen] = useState(() =>
+    isAccountNavigation(location.search, location.hash),
+  );
   useEffect(() => {
-    if (!portalGoogleAuthEnabled || !isCloud) return;
+    if (!isCloud) return;
     let alive = true;
     const sync = (id: string | null) => {
       if (!alive) return;
@@ -148,7 +151,10 @@ export function AuthGate({
       setBusy(false);
     }
   }
-  if (application && (!isCloud || session))
+  if (
+    application &&
+    (!isCloud || session || (application === "qr" && identity))
+  )
     return (
       <>
         {children(application, () => {
@@ -194,8 +200,12 @@ export function AuthGate({
           <span className="login-lock">
             <LockKeyhole size={25} />
           </span>
-          <h2>このページで開く</h2>
-          <p>{session ? "ログイン済みです。開くアプリを選択してください。" : "共通のログインIDとパスワードで利用できます。"}</p>
+          <h2>{session ? "アプリを開く" : "ログイン"}</h2>
+          <p>
+            {session
+              ? "開くアプリを選んでください。"
+              : "kotonohaとMARUGO QRは同じID・パスワードで入れます。"}
+          </p>
           <fieldset className="application-options compact" disabled={busy}>
             <legend>開くアプリ</legend>
             {(
@@ -233,23 +243,9 @@ export function AuthGate({
                   <strong>{name}</strong>
                   <small>{note}</small>
                 </span>
-                {selectedApplication === id && (
-                  <Check size={20} aria-hidden="true" />
-                )}
               </label>
             ))}
           </fieldset>
-          {portalGoogleAuthEnabled && isCloud && (
-            <details className="login-secondary">
-              <summary>Googleでログイン（補助）</summary>
-              <PortalGoogleAccess
-                application={selectedApplication}
-                onOpen={() => setApplication("kotonoha")}
-                onBusy={setBusy}
-                onIdentity={setIdentity}
-              />
-            </details>
-          )}
           <form onSubmit={login}>
             {isCloud && !session && (
               <>
@@ -263,6 +259,7 @@ export function AuthGate({
                     autoCapitalize="none"
                     spellCheck={false}
                     required
+                    disabled={busy}
                     placeholder="ログインIDを入力"
                   />
                 </label>
@@ -274,6 +271,7 @@ export function AuthGate({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={busy}
                   />
                 </label>
               </>
@@ -284,7 +282,11 @@ export function AuthGate({
               </div>
             )}
             <button className="button primary" disabled={busy}>
-              {busy ? <LoaderCircle size={17} className="spin" /> : <ArrowRight size={17} />}
+              {busy ? (
+                <LoaderCircle size={17} className="spin" />
+              ) : (
+                <ArrowRight size={17} />
+              )}
               {busy
                 ? "ログインしています…"
                 : session || !isCloud
@@ -293,11 +295,36 @@ export function AuthGate({
             </button>
             <div className="login-account-note">
               <ShieldCheck size={17} />
-              <p>
-                kotonohaとMARUGO QRは同じ共通IDでログインします。お披露目期間はQRの全店舗を利用できます。共用端末では利用後にログアウトしてください。
-              </p>
+              <p>共用端末では、使い終わったらログアウトしてください。</p>
             </div>
           </form>
+          {isCloud &&
+            (portalGoogleAuthEnabled || selectedApplication === "qr") && (
+              <details
+                className="login-secondary"
+                open={otherLoginOpen}
+                onToggle={(event) =>
+                  setOtherLoginOpen(event.currentTarget.open)
+                }
+              >
+                <summary>別の方法でログイン</summary>
+                {portalGoogleAuthEnabled && (
+                  <PortalGoogleAccess
+                    application={selectedApplication}
+                    onOpen={() => setApplication(selectedApplication)}
+                    onBusy={setBusy}
+                    onIdentity={setIdentity}
+                  />
+                )}
+                {selectedApplication === "qr" && (
+                  <QrAccountAccess
+                    onAuthenticated={() => setApplication("qr")}
+                    onBusy={setBusy}
+                    sharedGoogle={portalGoogleAuthEnabled}
+                  />
+                )}
+              </details>
+            )}
         </div>
       </section>
     </div>

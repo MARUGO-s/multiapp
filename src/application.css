@@ -5,11 +5,37 @@
   min-width: 0;
 }
 .application-options.compact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 20px;
 }
 .application-options.compact .application-option {
-  padding: 13px 14px;
-  margin-bottom: 8px;
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px 12px;
+  margin-bottom: 0;
+}
+.application-options.compact input {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+}
+.application-options.compact strong {
+  font-size: 15px;
+}
+.application-options.compact small {
+  font-size: 11px;
+}
+.login-form-panel .login-form-content {
+  max-width: 420px;
+}
+@media (max-width: 760px) {
+  .login-form-panel {
+    order: -1;
+  }
 }
 .login-secondary {
   margin: 22px 0 4px;

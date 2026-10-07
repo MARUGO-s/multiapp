@@ -138,7 +138,14 @@ export function PortalGoogleAccess({
         <>
           <p>{user.email}</p>
           {application === "qr" ? (
-            <p>下の「MARUGO QRを開く」から、所属店舗の利用許可を確認します。</p>
+            <button
+              type="button"
+              className="button primary"
+              disabled={busy}
+              onClick={onOpen}
+            >
+              MARUGO QRを開く
+            </button>
           ) : (
             <>
               <p>

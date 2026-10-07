@@ -239,8 +239,8 @@ export async function handler(req: Request): Promise<Response> {
       });
       return json({ targetUrl: normalizeTarget(data.targetUrl) });
     }
-    // Auth verifies the JWT remotely; DB derives the allowed store, not the body.
-    // Legacy shared credentials never authorize store management.
+    // Native Auth or the enabled shared session is verified server-side.
+    // The database derives the allowed store, never a workspace in the body.
     const session = await qrScope(req, url);
     const args = { p_owner: session.workspaceId };
     if (route === "/uploads" && req.method === "POST") {

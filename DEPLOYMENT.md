@@ -2,7 +2,7 @@
 
 ## 対象
 
-- GitHub: `MARUGO-s/OEM`、Pages `/OEM/`、`main` のGitHub Actionsでフロントを公開。
+- GitHub: `MARUGO-s/multiapp`、Pages `/multiapp/`、`main` のGitHub Actionsでフロントを公開。
 - Supabase: `Recipe-Management` / `hjhkccbktkscwtgzxjfq`。他アプリと共用。
 - 追加領域: `kotonoha.meetings`、`kotonoha.settings`、`kotonoha.access_config`、`kotonoha.sessions`、`kotonoha.login_attempts`、service_role限定RPC `public.kotonoha_store` / `public.kotonoha_auth`、非公開バケット `kotonoha-audio`、Edge Function `kotonoha-api`。
 - Authユーザー・設定・既存のOpenAIキーは変更しない。フロントにあるのは公開用publishable keyのみ。
@@ -10,6 +10,8 @@
 ## 更新
 
 フロントは `main` に反映するとビルド・テスト後にPagesへ公開します。Supabaseの自動マイグレーションはしません。
+
+2026-10-07のお披露目用共通QRログインは、未適用の `20261007100000_shared_qr_login.sql` だけを対象プロジェクトに適用し、`marugo-accounts` と `marugo-qr` を先に更新してからPagesを公開します。`kotonoha-api` のパスワードやログイン処理は変更不要です。共通セッションの期限・失効・パスワード認証由来を要求ごとに確認します。共通権限の停止はREADMEの `qr_shared_login_enabled=false` で行います。
 
 AAC・複数録音対応はEdge Functionとフロントの更新のみで、DBマイグレーションは不要です。専用会議documentの `audioParts` に順序・保存パス・完了済み文字起こしを保持します。旧 `audio_path` は先頭音声を指し、既存単一録音にはフォールバックします。AACは保存前にM4Aへ変換するため、既存バケットのMIME制限・容量設定も変更しません。ロールバックする際は複数録音に対応した版を維持してください（旧版では先頭以外の録音を処理できません）。
 
