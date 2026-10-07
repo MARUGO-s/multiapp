@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createDemo } from "../supabase/functions/_shared/demo.mjs";
+import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
 import { decryptApiKey } from "../supabase/functions/_shared/key-crypto.mjs";
 import { aacFixture } from "./fixtures/aac.mjs";
 import { documentFixtures } from "./fixtures/documents.mjs";
@@ -422,8 +423,9 @@ globalThis.fetch = async (input, init: any) => {
       assert.equal(body.store, true);
       assert.equal(body.text.format.type, "json_schema");
       assert.equal(body.text.format.strict, true);
+      assert.deepEqual(body.text.format.schema.properties.formats.required, ["brief", "standard", "detailed"]);
       const id = `resp-${calls.length}`;
-      responses.set(id, (createDemo() as any).minutes);
+      responses.set(id, minutesBundle((createDemo() as any).minutes));
       return json({ id, status: "queued" });
     }
     return json({
@@ -1573,6 +1575,21 @@ Deno.test(
       );
       assert.equal(rows.get(documentMeeting.id).document.minutesStale, false);
       assert.equal(rows.get(documentMeeting.id).document.template, "detailed");
+      const allFormats = await (await request(docRoute, "valid-b")).json();
+      assert.deepEqual(Object.keys(allFormats.markdownByFormat), ["brief", "standard", "detailed"]);
+      assert.equal(allFormats.markdown, allFormats.markdownByFormat.detailed);
+      const aiCount = calls.filter(c => c.route === "/v1/responses").length;
+      const usageCount = usageEvents.size;
+      const editView = await request(docRoute, "valid-a", { method: "PATCH", body: JSON.stringify({ markdown: "# 要約だけ手動修正", markdownFormat: "brief" }) });
+      assert.equal(editView.status, 200);
+      const otherSession = await (await request(docRoute, "valid-b")).json();
+      assert.equal(otherSession.markdownByFormat.brief, "# 要約だけ手動修正");
+      assert.equal(otherSession.markdownByFormat.standard, allFormats.markdownByFormat.standard);
+      assert.equal(otherSession.markdown, allFormats.markdown);
+      assert.deepEqual(otherSession.minutes, allFormats.minutes);
+      assert.equal(calls.filter(c => c.route === "/v1/responses").length, aiCount);
+      assert.equal(usageEvents.size, usageCount);
+      assert.equal((await request(docRoute, "valid-a", { method: "PATCH", body: JSON.stringify({ markdownFormat: "brief" }) })).status, 400);
       assert.match(calls.filter(c => c.route === "/v1/responses").at(-1)!.body.input[0].content, /背景、理由、異論も詳しく/);
       assert.equal(
         calls.filter((c) => c.route.endsWith("/transcriptions")).length,

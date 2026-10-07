@@ -7,13 +7,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { MINUTES_FORMATS } from "../supabase/functions/_shared/minutes-formats.mjs";
-import { minutesToMarkdown } from "../supabase/functions/_shared/domain.mjs";
+import { minutesDocuments } from "../supabase/functions/_shared/domain.mjs";
+import { parseMinutes } from "../supabase/functions/_shared/summary.mjs";
+import { minutesBundle } from "../tests/fixtures/minutes-bundle.mjs";
 
 const dataDir = await mkdtemp(path.join(tmpdir(), "kotonoha-minutes-ui-"));
 const { app, store } = await createApp({
   dataDir,
   apiKey: "sk-mock-test-only-never-sent",
-  aiFactory: () => ({ summarize: async () => createDemo().minutes }),
+  aiFactory: () => ({ summarize: async () => minutesBundle(createDemo().minutes) }),
 });
 for (const format of MINUTES_FORMATS) {
   const meeting = {
@@ -24,9 +26,10 @@ for (const format of MINUTES_FORMATS) {
     template: format.id,
     title: `表示検証・${format.label}（架空の会議）`,
   };
-  meeting.markdown = minutesToMarkdown(meeting, meeting.minutes);
-  await store.save(meeting);
+  meeting.minutes = parseMinutes(meeting, minutesBundle(meeting.minutes));
+  await store.save({ ...meeting, ...minutesDocuments(meeting, meeting.minutes) });
 }
+await store.save({ ...createDemo(), id: randomUUID(), isDemo: false, source: "text", title: "以前の単一形式（架空の会議）" });
 const api = app.listen(5197, "127.0.0.1");
 const vite = await createServer({
   server: {

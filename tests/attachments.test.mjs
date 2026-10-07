@@ -18,6 +18,7 @@ import { UploadSchema } from "../supabase/functions/_shared/upload.mjs";
 import { createDemo } from "../server/demo.mjs";
 import { createAI } from "../server/ai.mjs";
 import { documentFixtures, reviewFixture } from "./fixtures/documents.mjs";
+import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
 
 test("資料の形式・各10MB・合計25MB・5件とmanifestの重複を検証する", async () => {
   const f = { id: randomUUID(), name: "a.PDF", size: 10_000_000 };
@@ -151,7 +152,7 @@ test("実際のSDKペイロードに資料を含めず、照合schemaも要求�
             content: [
               {
                 type: "output_text",
-                text: JSON.stringify(minutes),
+                text: JSON.stringify(minutesBundle(minutes)),
                 annotations: [],
               },
             ],
@@ -160,6 +161,6 @@ test("実際のSDKペイロードに資料を含めず、照合schemaも要求�
       });
     },
   });
-  assert.deepEqual(await ai.summarize(meeting), minutes);
+  assert.deepEqual(await ai.summarize(meeting), parseMinutes(meeting, minutesBundle(minutes)));
   assert.ok(called);
 });

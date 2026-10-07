@@ -52,9 +52,9 @@ import {
   MetadataSchema,
   RetrySchema,
   PatchSchema,
-  renameMarkdownHeading,
+  minutesMarkdownPatch,
   audioExtensions,
-  minutesToMarkdown,
+  minutesDocuments,
   safeError,
   transcriptFromSegments,
 } from "./domain.mjs";
@@ -333,7 +333,7 @@ export async function createApp({
         ...meeting,
         status: "done",
         minutes,
-        markdown: minutesToMarkdown(meeting, minutes),
+        ...minutesDocuments(meeting, minutes),
         completedActions: [],
         error: null,
         minutesStale: false,
@@ -728,17 +728,11 @@ export async function createApp({
     }
   });
   app.patch("/api/meetings/:id", async (req, res) => {
-    const patch = PatchSchema.parse(req.body);
     const meeting = getMeeting(req.params.id);
     lock(meeting.id);
     try {
+      const patch = minutesMarkdownPatch(meeting, PatchSchema.parse(req.body));
       let next = { ...meeting, ...patch };
-      if (patch.title !== undefined && patch.markdown === undefined)
-        next.markdown = renameMarkdownHeading(
-          meeting.markdown,
-          meeting.title,
-          patch.title,
-        );
       if (
         patch.completedActions?.some(
           (i) => i >= (meeting.minutes?.actions.length || 0),

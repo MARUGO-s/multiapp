@@ -5,7 +5,8 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { MAX_TEXT_LENGTH } from "./domain.mjs";
 import {
-  CalendarMinutesSchema,
+  AllFormatsMinutesSchema,
+  MINUTES_OUTPUT_TOKENS,
   parseMinutes,
   summaryInput,
 } from "../supabase/functions/_shared/summary.mjs";
@@ -63,10 +64,10 @@ export function createAI(
         model,
         store: false,
         reasoning: { effort: "medium" },
-        max_output_tokens: 16000,
+        max_output_tokens: MINUTES_OUTPUT_TOKENS,
         input: summaryInput(meeting),
         text: {
-          format: zodTextFormat(CalendarMinutesSchema, "meeting_minutes"),
+          format: zodTextFormat(AllFormatsMinutesSchema, "meeting_minutes"),
         },
       });
       await onUsage(response);
