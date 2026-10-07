@@ -38,7 +38,7 @@ export const applicationLinks = [
   {
     id: "gourmet",
     name: "mimiyori",
-    note: "口コミ・予約管理",
+    note: "口コミ・グルメサイト管理",
     icon: "gourmet",
     href: "https://marugo-s.github.io/gourmet/",
   },
