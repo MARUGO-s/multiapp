@@ -10,9 +10,7 @@ export class AccountError extends Error {
 }
 export const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export type QrIdentity =
-  | { kind: "account"; userId: string }
-  | { kind: "shared"; workspaceId: string };
+export type QrIdentity = string | { kind: "shared"; workspaceId: string };
 function config() {
   const base = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -66,7 +64,7 @@ export async function qrIdentity(req: Request): Promise<QrIdentity> {
   const user = await response.json();
   if (!uuidPattern.test(user.id) || !user.email_confirmed_at)
     throw new AccountError(403, "メールアドレスの本人確認が必要です。");
-  return { kind: "account", userId: user.id };
+  return user.id;
 }
 const messages: Record<string, [number, string]> = {
   UNVERIFIED: [403, "メールアドレスの本人確認が必要です。"],
@@ -127,9 +125,9 @@ export async function qrScope(req: Request, url: URL) {
   const store = url.searchParams.get("storeId");
   if (store !== null && !uuidPattern.test(store))
     throw new AccountError(400, "店舗IDが正しくありません。");
-  if (identity.kind === "shared")
+  if (typeof identity !== "string")
     return await sharedAccountRpc("scope", identity.workspaceId, store);
-  return await accountRpc("scope", identity.userId, store);
+  return await accountRpc("scope", identity, store);
 }
 
 export async function sharedAccountRpc(

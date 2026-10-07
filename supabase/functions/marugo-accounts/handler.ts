@@ -66,8 +66,8 @@ export async function handler(req: Request): Promise<Response> {
     if (route === "/stores" && req.method === "GET")
       return json(await accountRpc("stores_public"));
     const identity = await qrIdentity(req);
-    const shared = identity.kind === "shared";
-    const actor = shared ? identity.workspaceId : identity.userId;
+    const shared = typeof identity !== "string";
+    const actor = shared ? identity.workspaceId : identity;
     if (route === "/context" && req.method === "GET")
       return json(
         shared
