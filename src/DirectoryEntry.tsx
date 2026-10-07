@@ -28,6 +28,10 @@ import {
 } from "./directory-client";
 import "./directory.css";
 import { DirectoryApprovals } from "./DirectoryApprovals";
+import {
+  GOURMET_USERS_URL,
+  gourmetManagementUrl,
+} from "./directory-management-links.mjs";
 
 type SourceState = { page?: DirectoryPage; busy?: boolean; error?: string };
 function date(value: string | null) {
@@ -402,6 +406,19 @@ export function UserDirectory() {
                     <div>
                       <h2>{source.name}</h2>
                       <p>{source.note}</p>
+                      {source.id === "social" && (
+                        <p>
+                          <a
+                            href={GOURMET_USERS_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            グルメのユーザー管理を開く ↗
+                          </a>
+                          <br />
+                          グルメの承認・店舗指定・管理者任命・削除はリンク先で行います。グルメ側の管理者ログインが必要です。変更後はこのページを再読込してください。
+                        </p>
+                      )}
                     </div>
                     <span className="dir-source-state">
                       {state?.busy
@@ -461,6 +478,17 @@ export function UserDirectory() {
                                 </td>
                                 <td>
                                   {directoryApps[row.app_id] || row.app_id}
+                                  {gourmetManagementUrl(row.app_id) && (
+                                    <small>
+                                      <a
+                                        href={GOURMET_USERS_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        ユーザー管理 ↗
+                                      </a>
+                                    </small>
+                                  )}
                                 </td>
                                 <td>
                                   <span

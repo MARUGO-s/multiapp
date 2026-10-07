@@ -13,7 +13,7 @@ export const directorySources = [
     name: "SNS・グルメ",
     ref: "ycsqfajidusuibqljjwr",
     apps: ["sns", "gourmet"],
-    note: "SNSのプロフィール・所属とグルメの店舗データ所有者を表示します。「登録あり」は承認済みという意味ではありません。",
+    note: "SNSのプロフィール・所属と、グルメの管理者・承認状態・閲覧許可店舗を表示します。グルメの状態はアプリ側のユーザー管理と共通です。SNSの「登録あり」は承認済みという意味ではありません。",
   },
   {
     id: "line",
