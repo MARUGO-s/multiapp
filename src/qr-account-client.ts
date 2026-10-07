@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./cloud";
+import {
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  getSession,
+} from "./cloud";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
 
 // One native identity client for QR + portal. Existing storage is preserved.
@@ -109,9 +113,10 @@ export function finishAccountCallback() {
 }
 export async function qrAccessToken() {
   const { data, error } = await qrAuth.auth.getSession();
-  if (error || !data.session)
-    throw new Error("QR管理にはメールアドレスでログインしてください。");
-  return data.session.access_token;
+  if (!error && data.session) return data.session.access_token;
+  const shared = getSession();
+  if (shared) return shared.token;
+  throw new Error("ログインが必要です。");
 }
 export function completeAccountRecovery() {
   callback = Promise.resolve({ recovery: false, message: "" });

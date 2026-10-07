@@ -2,6 +2,7 @@ import {
   AccountError,
   accountRpc,
   qrIdentity,
+  sharedAccountRpc,
   uuidPattern,
 } from "../_shared/qr-account-auth.ts";
 const origins = new Set([
@@ -64,9 +65,17 @@ export async function handler(req: Request): Promise<Response> {
     const route = match[1] || "";
     if (route === "/stores" && req.method === "GET")
       return json(await accountRpc("stores_public"));
-    const actor = await qrIdentity(req);
+    const identity = await qrIdentity(req);
+    const shared = typeof identity !== "string";
+    const actor = shared ? identity.workspaceId : identity;
     if (route === "/context" && req.method === "GET")
-      return json(await accountRpc("context", actor));
+      return json(
+        shared
+          ? await sharedAccountRpc("context", actor)
+          : await accountRpc("context", actor),
+      );
+    if (shared)
+      throw new AccountError(403, "共通IDではアカウント登録・管理を利用できません。");
     if (route === "/register" && req.method === "POST") {
       const input = await body(req);
       if (typeof input.storeId !== "string" || !uuidPattern.test(input.storeId))
