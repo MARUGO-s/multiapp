@@ -99,7 +99,7 @@ try {
     const create = page.locator(".qr-create-card");
     const picker = create.locator(".qr-logo-picker");
     await choose(picker, "instagram-gradient");
-    assert.equal(await picker.getByRole("radio").count(), 16);
+    assert.equal(await picker.getByRole("radio").count(), QR_LOGOS.length + 1);
     await geometry(page);
     await create.locator("input").first().fill("SNSロゴ入りQR（架空検証）");
     await create
@@ -282,7 +282,7 @@ try {
           });
         return out;
       });
-      assert.equal(artifacts.length, 15);
+      assert.equal(artifacts.length, 38);
       for (const artifact of artifacts) {
         const image = decode(artifact.png);
         assert.equal(
@@ -296,7 +296,7 @@ try {
       }
       results.push({
         viewport: viewport.name,
-        scenario: "all15-real-browser-assets-decode-to-original-url",
+        scenario: "all38-real-browser-assets-decode-to-original-url",
         passed: true,
         images: artifacts.length,
       });

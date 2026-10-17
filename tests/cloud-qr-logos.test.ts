@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { handler } from "../supabase/functions/marugo-qr/handler.ts";
-import { QR_LOGOS } from "../supabase/functions/_shared/qr-logos.mjs";
+import {
+  QR_LOGO_CATALOG_HEADER,
+  QR_LOGO_CATALOG_VALUE,
+  QR_LOGOS,
+} from "../supabase/functions/_shared/qr-logos.mjs";
 import { createToken } from "../supabase/functions/_shared/session.mjs";
 
 const owner = "00000000-0000-4000-8000-000000000061";
@@ -33,6 +37,7 @@ function request(
       method,
       headers: {
         origin: "https://marugo-s.github.io",
+        [QR_LOGO_CATALOG_HEADER]: QR_LOGO_CATALOG_VALUE,
         ...(auth ? { authorization: `Bearer ${auth}` } : {}),
       },
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),

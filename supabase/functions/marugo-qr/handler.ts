@@ -1,6 +1,10 @@
 import { AccountError, qrScope } from "../_shared/qr-account-auth.ts";
 import { validVisitorId, visitorHash } from "../_shared/qr-visitor.mjs";
-import { validateLogoId } from "../_shared/qr-logos.mjs";
+import {
+  QR_LOGO_CATALOG_HEADER,
+  supportsQrLogoPayload,
+  validateLogoId,
+} from "../_shared/qr-logos.mjs";
 import {
   FileError,
   publicFile,
@@ -175,14 +179,29 @@ export async function handler(req: Request): Promise<Response> {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     Vary: "Origin",
-    "Access-Control-Allow-Headers": "authorization,apikey,content-type",
+    "Access-Control-Allow-Headers": `authorization,apikey,content-type,${QR_LOGO_CATALOG_HEADER}`,
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
   };
   if (origin && origins.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data), { status, headers });
+  let checkCatalog = false;
+  const json = (data: unknown, status = 200) => {
+    if (
+      checkCatalog &&
+      status >= 200 &&
+      status < 300 &&
+      !supportsQrLogoPayload(data, req.headers.get(QR_LOGO_CATALOG_HEADER))
+    ) {
+      data = {
+        code: "QR_CATALOG_UPDATE_REQUIRED",
+        error:
+          "この画面では新しいロゴを表示できません。入力内容を控えてから画面を更新してください。直前の操作は保存済みの可能性があります。更新後に一覧を確認してください。",
+      };
+      status = 409;
+    }
+    return new Response(JSON.stringify(data), { status, headers });
+  };
   if (origin && !origins.has(origin)) {
     return json({ error: "アクセス元が許可されていません。" }, 403);
   }
@@ -244,6 +263,7 @@ export async function handler(req: Request): Promise<Response> {
     // Native Auth or the enabled shared session is verified server-side.
     // The database derives the allowed store, never a workspace in the body.
     const session = await qrScope(req, url);
+    checkCatalog = true;
     const args = { p_owner: session.workspaceId };
     if (route === "/uploads" && req.method === "POST") {
       const input = await body(req);

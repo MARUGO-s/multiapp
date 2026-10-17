@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 import { scopedQrPath } from "../src/qr-account-routing.mjs";
+import * as qrLogoCatalog from "../supabase/functions/_shared/qr-logos.mjs";
 test("QR API binds all CRUD, analytics, trash and file requests to store and identity", async () => {
   const user = "00000000-0000-4000-8000-000000000101";
   const first = "00000000-0000-4000-8000-000000000102";
@@ -12,7 +13,9 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
   let session = { user: { id: user }, access_token: "test.native.jwt" };
   let sharedCredentials = null;
   let status = 200;
+  let responseData = {};
   const calls = [];
+  const timeouts = [];
   const module = { exports: {} };
   const source = ts.transpileModule(
     readFileSync(
@@ -31,7 +34,12 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
     exports: module.exports,
     Error,
     Promise,
-    AbortSignal,
+    AbortSignal: {
+      timeout(ms) {
+        timeouts.push(ms);
+        return AbortSignal.timeout(ms);
+      },
+    },
     require(name) {
       if (name === "react")
         return {
@@ -60,12 +68,18 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
           },
         };
       if (name === "./qr-account-routing.mjs") return { scopedQrPath };
+      if (name === "../supabase/functions/_shared/qr-logos.mjs")
+        return qrLogoCatalog;
       if (name === "./qr-routing.mjs") return { buildTrackingUrl: () => "" };
       throw new Error(name);
     },
     fetch: async (url, options) => {
       calls.push({ url, options });
-      return { status, ok: status === 200, json: async () => ({}) };
+      return {
+        status,
+        ok: status >= 200 && status < 300,
+        json: async () => structuredClone(responseData),
+      };
     },
   });
   const oldStore = module.exports.useQrApi();
@@ -80,10 +94,44 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
     "/uploads/123/complete",
     "/uploads/123",
   ]) {
-    await oldStore(path, { method: "POST" });
+    const body = JSON.stringify({
+      id: "00000000-0000-4000-8000-000000000104",
+      title: " 入力を保持 ",
+      targetUrl: "https://example.invalid/draft?unchanged=1",
+      logoId: "store-marugo-d",
+    });
+    const options = {
+      method: "POST",
+      body,
+      headers: { Authorization: "caller-cannot-override" },
+    };
+    const originalOptions = structuredClone(options);
+    await oldStore(path, options);
     const call = calls.at(-1);
+    assert.equal(
+      call.url,
+      `https://test.invalid/functions/v1/marugo-qr${scopedQrPath(path, first)}`,
+    );
     assert.equal(new URL(call.url).searchParams.get("storeId"), first);
+    assert.equal(call.options.method, "POST");
+    assert.equal(call.options.body, body);
+    assert.deepEqual(options, originalOptions);
+    assert.equal(call.options.headers.apikey, "public-only");
+    assert.equal(call.options.headers["Content-Type"], "application/json");
+    assert.deepEqual(Object.keys(call.options.headers).sort(), [
+      "Authorization",
+      "Content-Type",
+      "apikey",
+      "x-qr-logo-catalog",
+    ]);
+    assert.ok(call.options.signal instanceof AbortSignal);
+    assert.equal(timeouts.at(-1), 15000);
     assert.equal(call.options.headers.Authorization, "Bearer test.native.jwt");
+    assert.equal(
+      call.options.headers["x-qr-logo-catalog"],
+      qrLogoCatalog.QR_LOGOS.map((logo) => logo.id).join(","),
+      "every managed request advertises the exact bundled catalog",
+    );
   }
   scope = { userId: user, storeId: second };
   const newStore = module.exports.useQrApi();
@@ -116,6 +164,34 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
   await sharedStore("/links");
   assert.equal(calls.at(-1).options.headers.Authorization, "Bearer ktn_test");
   assert.equal(new URL(calls.at(-1).url).searchParams.get("storeId"), second);
+  status = 409;
+  responseData = {
+    code: "QR_CATALOG_UPDATE_REQUIRED",
+    error:
+      "入力内容を控えてから画面を更新してください。直前の操作は保存済みの可能性があります。",
+  };
+  const retryBody = JSON.stringify({
+    id: first,
+    title: "保持する入力",
+    targetUrl: "https://example.invalid/retry",
+  });
+  const credentialsBeforeConflict = structuredClone(sharedCredentials);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(
+      sharedStore("/links", { method: "POST", body: retryBody }),
+      /保存済みの可能性/,
+    );
+    assert.equal(calls.at(-1).options.body, retryBody);
+    assert.equal(calls.at(-1).options.headers.Authorization, "Bearer ktn_test");
+    assert.deepEqual(sharedCredentials, credentialsBeforeConflict);
+  }
+  assert.equal(
+    JSON.parse(calls.at(-2).options.body).id,
+    JSON.parse(calls.at(-1).options.body).id,
+  );
+  status = 200;
+  responseData = { id: first, logo_id: "store-marugo-d" };
+  assert.deepEqual(await sharedStore("/links"), responseData);
   const sharedBefore = calls.length;
   await assert.rejects(oldStore("/links"), /ログイン情報/);
   sharedCredentials = {

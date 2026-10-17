@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "inputCount": 15,
-  "assetCount": 15,
-  "assetTotalBytes": 58834,
+  "inputCount": 38,
+  "assetCount": 38,
+  "assetTotalBytes": 1099169,
   "notes": [
     "Provided SNS_logo catalog. Source filenames preserved exactly; PNG derivatives are the only publicly served artwork.",
     "Inkscape 1.4 offline sandbox rendering for SVG, Pillow RGBA metadata removal; no source modification.",
-    "Source rights and any required brand/Icons8 attribution have not been independently verified."
+    "Source rights and any required brand/Icons8 attribution have not been independently verified.",
+    "23 user-supplied store SVG attachments were audited and rasterized with offline Inkscape. Store derivatives use a uniform scale up to 512px, preserving meaningful backgrounds and all artwork; only transparent exterior padding may be trimmed. Existing 15 SNS derivatives are unchanged."
   ],
   "entries": [
     {
@@ -143,6 +144,627 @@
       "assetSha256": "cf969cd802e68bc262387446743438f1e95254e3ae5f50bcfa6f15ca5cc03ae7",
       "assetBytes": 1622,
       "dimensions": [96, 96]
+    },
+    {
+      "id": "store-marugo-d",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo_marugo-d_fc0556.svg",
+      "sourceSha256": "19488794902d19657262c39e6d459480ee86e851d6758aff0c4b1b6fb9d327c9",
+      "sourceBytes": 10986,
+      "assetSha256": "fd5eca86abb5b21696de45b0d78bccd827421c318cf31b7ac60a430594e9d8aa",
+      "assetBytes": 65358,
+      "dimensions": [512, 326],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 2603],
+          "pageDimensions": [4096, 2603],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 122.12 77.61",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 2608.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 5.0]
+      }
+    },
+    {
+      "id": "store-marugo-es",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo_marugo-es_b37ba5.svg",
+      "sourceSha256": "8c79bad235b9d8977609bbb90cfd543f57dd3587019d8589e838819a507b324d",
+      "sourceBytes": 13746,
+      "assetSha256": "35cfb01f89c8def02a3baa8b5cd2a851e8b1d8e66da5807691e40d99179e3258",
+      "assetBytes": 96050,
+      "dimensions": [430, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 3434, 4096],
+          "pageDimensions": [3434, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 970.98 1158",
+        "sourceSamplingBox": [0.0, 0.0, 3440.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [6.0, 0.0]
+      }
+    },
+    {
+      "id": "store-371bar",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-371bar_c655f3.svg",
+      "sourceSha256": "be7b7cb29a630dfe98bf990ee8a4643a889bf519f323997697b63211d393fdf2",
+      "sourceBytes": 9047,
+      "assetSha256": "ffb14aa97cd85e86109588fe48112905eacc1e9165547ea2fa8c613158c26fae",
+      "assetBytes": 27421,
+      "dimensions": [512, 247],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 1970],
+          "pageDimensions": [4096, 1970],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 101.57 48.85",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 1976.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 6.0]
+      }
+    },
+    {
+      "id": "store-blu-nero",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-blu-nero_a15e7c.svg",
+      "sourceSha256": "3514757773515238e47f45a7f9b4cbbf2f1e835573b39989b6b48f245618e820",
+      "sourceBytes": 3339,
+      "assetSha256": "f77122a2002229415902478006f51ef3b4b220ed14bd9f42ca63d9f5d40b6c81",
+      "assetBytes": 29741,
+      "dimensions": [512, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 4096],
+          "pageDimensions": [4096, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 231.5 231.5",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-briccola",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-briccola_328bb4.svg",
+      "sourceSha256": "2146bde4f79c3286c3a8b97ca1225099ce0445402a91d41cc5565ac73629a8bc",
+      "sourceBytes": 16447,
+      "assetSha256": "028385dae5a051e078739fa369f22ba7b1de65b4b721a75174740051d04b5313",
+      "assetBytes": 62947,
+      "dimensions": [498, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [1, 0, 3985, 4096],
+          "pageDimensions": [3985, 4096],
+          "removedLTRB": [1, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 136.52 140.33",
+        "sourceSamplingBox": [0.0, 0.0, 3984.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-cava",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-cava_e050ff.svg",
+      "sourceSha256": "c2fa70f765a6c3414e1365951f194f46a9f1ee2bb93beeb108cecf4a933766c7",
+      "sourceBytes": 5881,
+      "assetSha256": "c60a39bc05136909c4de1eaaf7b14359e1cd9b351255a3feb44432fa7214d8a4",
+      "assetBytes": 26427,
+      "dimensions": [512, 134],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 1068],
+          "pageDimensions": [4096, 1068],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 109.26 28.5",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 1072.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 4.0]
+      }
+    },
+    {
+      "id": "store-claudia2",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-claudia2_856d6c.svg",
+      "sourceSha256": "d69c7522b8989a49ae0e5dc1e8b4d4abcbd1dfd72cf96aa8ddf874d1b93abe05",
+      "sourceBytes": 32964,
+      "assetSha256": "1ef1944e1621dcc306fcfcad55b16f1acbd8dd7d14319676ab75d80a3373ef22",
+      "assetBytes": 78522,
+      "dimensions": [512, 391],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 3127],
+          "pageDimensions": [4096, 3127],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 98.18 74.95",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 3128.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 1.0]
+      }
+    },
+    {
+      "id": "store-donaiya",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-donaiya_f8b792.svg",
+      "sourceSha256": "cb007c365f2573089c0dce09a97ebb62cac411295e565df6c7dfcef31039d9f9",
+      "sourceBytes": 22185,
+      "assetSha256": "992ec873ff469a7b003f385d9c28516b13a4a447db1311f0564cb1d24a7c3822",
+      "assetBytes": 55318,
+      "dimensions": [512, 329],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 2631],
+          "pageDimensions": [4096, 2631],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 76.7 49.27",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 2632.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 1.0]
+      }
+    },
+    {
+      "id": "store-erics",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-erics_c6cd02.svg",
+      "sourceSha256": "4aded3383c22722f138cff8620a428b5dbea20fc64dc18d85b326decd454110d",
+      "sourceBytes": 10596,
+      "assetSha256": "6c59edf22cfe0e26be4385c5c5594d68c222b73de01cfeefda5b7f7504a55979",
+      "assetBytes": 49958,
+      "dimensions": [512, 364],
+      "geometry": {
+        "uniformScale": [512, 4095],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [1, 0, 4096, 2910],
+          "pageDimensions": [4096, 2910],
+          "removedLTRB": [1, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 113.25 80.46",
+        "sourceSamplingBox": [0.0, 0.0, 4095.0, 2911.2890625],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 1.2890625]
+      }
+    },
+    {
+      "id": "store-koruri",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-koruri_3dfe15.svg",
+      "sourceSha256": "28732d98363417ba00be2e6513977a2ece2a6fce79dfde443fc8f1f1f0f0d0f6",
+      "sourceBytes": 34655,
+      "assetSha256": "822b3eb499b097fcd197a65a9564740b088a8edcd2f6b5335610325671a405cb",
+      "assetBytes": 25239,
+      "dimensions": [512, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 4096],
+          "pageDimensions": [4096, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 106.95 106.95",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-marugo-1",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-1_5378e3.svg",
+      "sourceSha256": "0ff1010c552728493eddf3ee0550021833c0e42cd08b41ec7caa6751aede3ac3",
+      "sourceBytes": 3999,
+      "assetSha256": "28aeba28692fe3a3c9af9054d12c48ccef54cb14b8ba0063df68d9901296310d",
+      "assetBytes": 15317,
+      "dimensions": [512, 106],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 848],
+          "pageDimensions": [4096, 848],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 89.53 18.54",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 848.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-marugo-2",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-2_a5199a.svg",
+      "sourceSha256": "8ee2e95e0fb251585973d87eed32c44e956995d1e629109d7614c7452d2bf8cb",
+      "sourceBytes": 4664,
+      "assetSha256": "3c33077d88acab4154fc3044c25cf64ab81f07f1da24037f74add59f0f5a9277",
+      "assetBytes": 15159,
+      "dimensions": [512, 93],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 739],
+          "pageDimensions": [4096, 739],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 103.01 18.59",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 744.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 5.0]
+      }
+    },
+    {
+      "id": "store-marugo-grande",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-grande_2e6430.svg",
+      "sourceSha256": "89b1e45a31d604c00a2864e748e31a8c59c72c7ce4dd7685242ae430b9d9191b",
+      "sourceBytes": 6656,
+      "assetSha256": "605b9444488ea47b2b6cde5de209f4affae49b4cc8060a3c661027926a3b6654",
+      "assetBytes": 23165,
+      "dimensions": [512, 106],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 842],
+          "pageDimensions": [4096, 842],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 91.8 18.86",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 848.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 6.0]
+      }
+    },
+    {
+      "id": "store-marugo-marunouchi",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-marunouchi_5da8bc.svg",
+      "sourceSha256": "b1ec656760940808a0bc553c9fa6b88d2955caa702fc30476314c5c093406a78",
+      "sourceBytes": 4258,
+      "assetSha256": "2d18dff62e63761a2c0a0eb86d1782993a9b1764d11f88b7de941ea3f6649236",
+      "assetBytes": 18781,
+      "dimensions": [512, 93],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 744],
+          "pageDimensions": [4096, 744],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 114.75 20.83",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 744.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-marugo-otto",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-otto_0311e9.svg",
+      "sourceSha256": "6c7320a3a672e1885ac935146dded037985d11a9d1cdb95e3de7835f4a7913fc",
+      "sourceBytes": 5582,
+      "assetSha256": "ae61117b6ac7f86e19c207f1434de8e4f681909ccc6f1b67f54f7ac74761cc91",
+      "assetBytes": 19413,
+      "dimensions": [512, 108],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 863],
+          "pageDimensions": [4096, 863],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 90.07 18.98",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 864.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 1.0]
+      }
+    },
+    {
+      "id": "store-marugo-shinbashi",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-shinbashi_c9c346.svg",
+      "sourceSha256": "df787d1b306bb304e04101124db28f98dea1255ecf2ea0e3f708beb5a8ad2f10",
+      "sourceBytes": 25274,
+      "assetSha256": "d6c440360bef92b30c655d31baf30561cdd99a27225842adc1bcf13c0aa39acc",
+      "assetBytes": 87195,
+      "dimensions": [350, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 2800, 4096],
+          "pageDimensions": [2800, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 104.85 153.37",
+        "sourceSamplingBox": [0.0, 0.0, 2800.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-marugo-yotsuya",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-marugo-yotsuya_3963e3.svg",
+      "sourceSha256": "45d54022f84dba1f8a470d74fa4e6d7e393ee90800e2877468b1cc45bc9ee522",
+      "sourceBytes": 27273,
+      "assetSha256": "8f103cd02637e62def69ee5bd054c020d8a17826a62092f9e1751531a4d29fb6",
+      "assetBytes": 103419,
+      "dimensions": [512, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 4094],
+          "pageDimensions": [4096, 4094],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 148.76 148.7",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 2.0]
+      }
+    },
+    {
+      "id": "store-mitan",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-mitan_c37082.svg",
+      "sourceSha256": "6d8e4a6c53430f94d37891aa10f4e46c03b5221f080c7df2fb589c999c78e954",
+      "sourceBytes": 6940,
+      "assetSha256": "e1e5da31872d3b3486e1f5f2ad0909180efdd9362a835b68b913d608c96ffddd",
+      "assetBytes": 31608,
+      "dimensions": [512, 110],
+      "geometry": {
+        "uniformScale": [256, 2047],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4094, 877],
+          "pageDimensions": [4096, 1142],
+          "removedLTRB": [0, 0, 2, 265],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 122 34",
+        "sourceSamplingBox": [0.0, 0.0, 4094.0, 879.5703125],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 2.5703125]
+      }
+    },
+    {
+      "id": "store-pelota",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-pelota_a9a513.svg",
+      "sourceSha256": "225524d2238e35346257b0f75e77586764b4e236de336768ae81af27d6540534",
+      "sourceBytes": 2141,
+      "assetSha256": "f923c548e56cfbb9e73dd1fdc3fad8b3add60c5a71611f1d1b70d3402c396f22",
+      "assetBytes": 29012,
+      "dimensions": [512, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 4096],
+          "pageDimensions": [4096, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 96.56 96.56",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-sobaju",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-sobaju_f287de.svg",
+      "sourceSha256": "8bda62712157c27ebf180e14ee5871a886368e953e4b6727cc30ba3392e1be5b",
+      "sourceBytes": 4706,
+      "assetSha256": "b48d440ad41b4399d8453d072f4930afffc5ad4adbda4fcc8ee3805994d16cb3",
+      "assetBytes": 18879,
+      "dimensions": [512, 110],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 880],
+          "pageDimensions": [4096, 880],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 134.15 28.83",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 880.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
+    },
+    {
+      "id": "store-violet",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-violet_f93358.svg",
+      "sourceSha256": "96303e0e32fafdc3e85c70197ecac499dae4cfec8840dcddac9680138f0d7619",
+      "sourceBytes": 6080,
+      "assetSha256": "e30186018edb5eaa6275a49df05d5cf7fd27f1f80a9e9af00f08c7d69f266d3e",
+      "assetBytes": 38594,
+      "dimensions": [495, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 3957, 4096],
+          "pageDimensions": [3957, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 102.86 106.48",
+        "sourceSamplingBox": [0.0, 0.0, 3960.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [3.0, 0.0]
+      }
+    },
+    {
+      "id": "store-x-c",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-x_c_ae0d0c.svg",
+      "sourceSha256": "8022db5cf724d9ef2a7ed97f6e7002572b6d8e461541f840ab52965d8d7a88a5",
+      "sourceBytes": 7247,
+      "assetSha256": "2d00d52d6882a85ddb4641c30f90c04da7a9c4302e219f2d300bea5cc7f6a18b",
+      "assetBytes": 55072,
+      "dimensions": [512, 446],
+      "geometry": {
+        "uniformScale": [256, 1595],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [452, 450, 3642, 3227],
+          "pageDimensions": [4096, 4096],
+          "removedLTRB": [452, 450, 454, 869],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 1000 1000",
+        "sourceSamplingBox": [0.0, 0.0, 3190.0, 2778.7890625],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 1.7890625]
+      }
+    },
+    {
+      "id": "store-yakiniku",
+      "sourceKind": "store-attachment",
+      "sourceFilename": "logo-yakiniku_0e242d.svg",
+      "sourceSha256": "deaa05998c18d033b027709a3b987fdeb857b98dbae7f723b403e195a613c3f2",
+      "sourceBytes": 7172,
+      "assetSha256": "a14a0222ad49dd8d24f73fa78a9fea2e8966078acf283c5ffb8ba03774f0011a",
+      "assetBytes": 67740,
+      "dimensions": [512, 512],
+      "geometry": {
+        "uniformScale": [1, 8],
+        "contentCropped": false,
+        "transparentOnlyExteriorTrim": true,
+        "trimBBox": {
+          "coordinateSpace": "highResolutionPagePixels",
+          "convention": "left,top,right,bottom; right/bottom exclusive",
+          "bbox": [0, 0, 4096, 4096],
+          "pageDimensions": [4096, 4096],
+          "removedLTRB": [0, 0, 0, 0],
+          "removedPixelsAreFullyTransparent": true,
+          "semanticWhiteAndColoredBackgroundsPreserved": true
+        },
+        "sourceViewBox": "0 0 110.32 110.32",
+        "sourceSamplingBox": [0.0, 0.0, 4096.0, 4096.0],
+        "transparentCanvasPaddingRightBottomInMasterPixels": [0.0, 0.0]
+      }
     }
   ]
 }
