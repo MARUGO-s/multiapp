@@ -34,7 +34,7 @@ jobs:
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-google-auth.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-tick.test.ts
       - run: deno check --config supabase/functions/marugo-qr/deno.json supabase/functions/marugo-qr/index.ts
-      - run: deno test --allow-env --config supabase/functions/marugo-qr/deno.json tests/cloud-qr.test.ts tests/cloud-qr-files.test.ts
+      - run: deno test --allow-env --config supabase/functions/marugo-qr/deno.json tests/cloud-qr.test.ts tests/cloud-qr-files.test.ts tests/cloud-qr-logos.test.ts
       - run: deno check --config supabase/functions/marugo-accounts/deno.json supabase/functions/marugo-accounts/index.ts
       - run: deno test --allow-env --config supabase/functions/marugo-accounts/deno.json tests/cloud-accounts.test.ts tests/cloud-shared-qr.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-bot.test.ts
