@@ -1,16 +1,16 @@
 # MARUGO QR — 中央ロゴの選択・共有保存
 
-更新日: 2026-10-17
+更新日: 2026-10-18（JST）
 
 ## 状態
 
-### 店舗23点の本番反映準備（ユーザー指示済み）
+### 店舗23＋SNS15点：本番反映・公開確認済み（2026-10-18 JST）
 
-ユーザー提供の店舗SVG23点を追加し、候補カタログは店舗23＋承認済みSNS15の計38点。原本23点のSHA-256/size/mtime/ctime/inodeとSNS15 PNGのバイト不変を親でも再確認した。店舗/SNSを分けた単一選択UI、URL/ファイル作成、共有変更/解除、再表示と同一PNG保存をPC/スマホ/タブレット縦横の代替APIで検証した。本番DB・Edge・Pagesはこの追加のためには変更していない。
+ユーザー提供の店舗SVG23点を追加し、公開カタログは店舗23＋承認済みSNS15の計38点。原本23点のSHA-256/size/mtime/ctime/inodeとSNS15 PNGのバイト不変を親でも再確認した。店舗/SNSを分けた単一選択UI、URL/ファイル作成、共有変更/解除、再表示と同一PNG保存をPC/スマホ/タブレット縦横の代替APIで検証した。本番は限定validator migration1件 → `marugo-qr` v14 → Pages/38 PNGの順で反映し、各段階を読み戻した。
 
-**読み取り回帰は解消**：親も更新済み実helperから305 PNG（38点×8 mask＋実ロゴなし）を再生成し、OpenCV 5.0.0の原寸640/INTER_AREA320・240・160/90度回転/JPEG75の1,830条件すべてで元payload完全一致・失敗0を確認した。横長7点の旧14失敗は、白footprintがバッジ外に新設する疑似finderクロスを全候補共通で禁止することで解消。色・字形・maskは変更せず、単一セル介入の因果試験と独立参照実装で検証した。2026-10-17、ユーザーの「デプロイして」で本番反映の明示指示を受けた。最終差分の独立レビューと本番のDB/Edge/Pages/全PNG読戻しを経て反映完了とする。
+**読み取り回帰は解消**：親も更新済み実helperから305 PNG（38点×8 mask＋実ロゴなし）を再生成し、OpenCV 5.0.0の原寸640/INTER_AREA320・240・160/90度回転/JPEG75の1,830条件すべてで元payload完全一致・失敗0を確認した。横長7点の旧14失敗は、白footprintがバッジ外に新設する疑似finderクロスを全候補共通で禁止することで解消。色・字形・maskは変更せず、単一セル介入の因果試験と独立参照実装で検証した。2026-10-17、ユーザーの「デプロイして」で本番反映の明示指示を受けた。最終描画差分・UI/API/SQLの独立レビューはいずれも合格し、本番DB/Edge/Pages/全PNGの読戻しも完了した。
 
-旧本番 `dc677e8` の4ソースと配信source mapを照合し、実旧qrApi→実候補handler→隔離loopback backendで、未知店舗IDのpoll/再表示/保存後の409再試行でもroot・入力・架空セッション・同一body/request IDを保持した。本番業務送信0。親の使い捨てPostgreSQLでは9 SQLファイル＋実ロック競合3件が成功し、対象validator以外の定義/既存全フィールド不変、実ロールの権限、全23 IDの共有保存・編集・解除・再送を確認、コンテナー不在も読み戻した。追加migration `20261017204127_qr_store_logo_catalog.sql` は未適用。
+旧本番 `dc677e8` の4ソースと配信source mapを照合し、実旧qrApi→実候補handler→隔離loopback backendで、未知店舗IDのpoll/再表示/保存後の409再試行でもroot・入力・架空セッション・同一body/request IDを保持した。本番業務送信0。親の使い捨てPostgreSQLでは9 SQLファイル＋実ロック競合3件が成功し、対象validator以外の定義/既存全フィールド不変、実ロールの権限、全23 IDの共有保存・編集・解除・再送を確認、コンテナー不在も読み戻した。追加migration `20261017204127_qr_store_logo_catalog.sql` はレビュー済みソース1件だけを本番へ限定適用し、台帳・関数本体hash・サービス専用権限を読み戻した。
 
 ### 公開確認済み：SNS15点（店舗追加前の基準）
 
@@ -18,7 +18,7 @@
 
 ## 確認済みの要件
 
-- ユーザー提供の `Desktop/SNS_logo` の15画像に店舗SVG23画像を追加し、候補は計38点。店舗追加は未公開で、原本・配色・縦横比・シルエットと意味ある背景/穴を維持する。全利用者向けの静的素材であり、QRの保存/編集権限は既存の店舗scopeから広げない。
+- ユーザー提供の `Desktop/SNS_logo` の15画像に店舗SVG23画像を追加し、候補は計38点。店舗追加も本番公開済み。原本・配色・縦横比・シルエットと意味ある背景/穴を維持する。全利用者向けの静的素材であり、QRの保存/編集権限は既存の店舗scopeから広げない。
 - URLから作成・ファイルから作成の双方で中央ロゴを任意に選ぶ。初期値は「ロゴなし」。
 - 選んだロゴはQRごとに保存し、同じ店舗の利用者の再表示・PNG保存にも反映する（ユーザー確認済み）。
 - 既存QRもロゴだけ変更・解除できる。変更してもコード・計測URL・転送先・回数・アクセス履歴を変えない。配布済みPNGの見た目を遠隔で書き換える機能ではない。
@@ -53,7 +53,7 @@ QR開発元のDENSO WAVEは、イラストを重ねると読み取りが遅く�
 
 ## 素材と公開範囲
 
-候補の `public/qr-logos/` は固定許可リストのPNG38件（店舗23＋SNS15、合計1,099,169 bytes）。本番公開確認済みなのはSNS15件で、店舗23件は未公開。SVGの文字列、任意の画像URL、data URI、パスはAPIで受け付けない。元のロゴ集は編集しない。
+`public/qr-logos/` は本番公開確認済みの固定PNG38件（店舗23＋SNS15、合計1,099,169 bytes）。SVGの文字列、任意の画像URL、data URI、パスはAPIで受け付けない。元のロゴ集は編集しない。
 
 元SVGの外部参照・スクリプト等を監査した上でInkscapeのネットワーク禁止実行で正しく描画し、メタデータを除去したRGBA PNGへ変換した。11MB近いグラデーションSVGをブラウザーへ配信しない。SNS配信用15件は従来どおり合計58,834 bytes、最大128px（小さい原本は無意味に拡大しない）。元のファイル名（分解Unicodeも維持）と原本/配信用PNGのSHA-256は `docs/qr-logo-assets.json` に記録している。
 
@@ -70,7 +70,7 @@ QR開発元のDENSO WAVEは、イラストを重ねると読み取りが遅く�
 - `src/qr-api.ts`: `QrLink.logo_id`（旧データは未指定/null）。認証の送信経路は変えない。
 - `supabase/migrations/20261017100000_qr_logo_selection.sql`: 専用QRテーブルの追加列と許可ID制約、既存の最新RPCを拡張する対象マイグレーション。共用プロジェクトへ一括 `db push/reset` はしない。
 
-- `supabase/migrations/20261017204127_qr_store_logo_catalog.sql`: 既存validatorの固定allowlistだけを38へ拡張する追加migration（未適用）。過去24 migrationを編集しない。
+- `supabase/migrations/20261017204127_qr_store_logo_catalog.sql`: 既存validatorの固定allowlistだけを38へ拡張する追加migration（本番適用・台帳読戻し済み）。過去24 migrationを編集しない。
 
 ### APIと永続化の契約
 
@@ -84,6 +84,16 @@ QR開発元のDENSO WAVEは、イラストを重ねると読み取りが遅く�
 
 ## 検証証跡（実行済み分のみ）
 
+### 店舗23点の本番反映読戻し（2026-10-18 JST）
+
+- 公開許可：2026-10-17、ユーザーの「デプロイして」を受領。機能PR #52の候補 `8e416103da6d20be50bb4bb2bf8d9fc222008442` を統合し、main `ee8ca957b69aef8aa1d763841258760a6b96db58` の全57変更ファイルが候補と一致することを確認。
+- DB：対象 `Recipe-Management / hjhkccbktkscwtgzxjfq` の既存validator allowlistだけを38へ拡張。正確な運用SQLを使い捨てPGでリハーサル後、短いQR3表ロック・5秒lock/30秒statement上限・旧ソース/台帳guardを持つ単一transactionで限定適用。QR17/ファイル11/アクセス履歴21の全既存フィールド（`logo_id`も含む）、他関数・列・policy・制約・index・trigger・relation定義は前後の指紋が一致。公開RPC2件と権限は不変。実DBで全38 ID/null受入と未知/空/配列拒否を確認し、再開時にも台帳と関数hashを再読戻しした。旧24 migrationの再適用・共用db push/reset・業務行の補正はない。
+- Edge：明示名 `marugo-qr` だけをv14へ更新。ACTIVE / `verify_jwt=false` を維持し、downloadした全10ソースが候補とbyte/hash一致。他Edge25件のID/版/状態/JWT設定は不変。公開originのOPTIONS204とcatalog header許可、未認証GET401を確認。これは実利用者のログイン成功試験ではない。
+- Pages：実行 `39046605816` は上記main SHAでbuild/deploy成功。CI成果物のHTML・遅延ロードを含む全JS/MJS/CSS・38 PNGの56ファイルを、通常/キャッシュ回避の112取得で全byte一致として確認した。素材38件のSHAは台帳・ローカル原本派生PNGとも一致。
+- 公開Chrome：PC1440px/スマホ390px、38点＋ロゴなしの39選択肢、店舗ロゴ作成→別店舗ロゴへ変更→再表示→解除、PNG保存先とプレビューの一致、元の計測URLへの復号、catalog header送信を確認。全業務APIを代替境界で遮断し、本番への業務送信0、ロゴ以外の架空レコード全フィールド不変。公開処理の成功を本番業務データの実保存や実機撮影・印刷の保証と混同しない。
+- CI：Node277件＝273成功/失敗0/任意4skip（実Graphify連携3・OpenCV環境1）、Deno42成功。任意ゲートは親の実環境で別途有効化し、Graphify連携36/36、実PNG独立復号1,830/1,830を確認した。ローカル固有の添付1失敗は既存baselineと同一で、無関係なserver/test変更で隠していない。
+- 独立レビュー：UI/API/SQL/CI統合、最終locator差分、再開時のUI/API/SQL補足レビューがすべて合格。実PGと実旧UI→候補handler接続は親が別途実行し、レビュアー未実行の経路を成功扱いしていない。
+
 ### 店舗追加の反映前検証（1,830条件すべて成功）
 
 - 親側資産読戻し：全23原本のSHA/statと店舗PNG SHAが一致、SNS15 PNG byte不変。38件と合計bytesも実ファイル一致。
@@ -92,7 +102,7 @@ QR開発元のDENSO WAVEは、イラストを重ねると読み取りが遅く�
 - 最終反映前に親も実行：TypeScript/Vite/build成功、許可scratchをTMPDIRに固定しGraphify連携を有効化した全体Node277件は276成功・既存添付1失敗・skip0。失敗はbaseline同一 `tests/app.test.mjs:314` のみ。旧SNS15/no-logoの全field/RGBA/PNG互換も保持。
 - Pagesの全Deno実コマンド11件を親も実行し、型検査および42テスト成功。新store/compat試験のCI明示列挙漏れを検出するNode試験をRED→GREENで追加した。
 - 親側PostgreSQL17で9 SQL＋競合3件成功。target以外のcatalog9分類/既存全fields不変、service_role保存とanon/authenticated拒否、全23 ID、旧SNS15/null/省略、共有変更/解除/immutable upload retry/分析/ゴミ箱を検査。ネットワークなし・pull禁止・ローカルUnix socket固定で実施し、正確なコンテナー名の不在を読み戻した。過去migration24件もgit基準とbyte一致。
-- 親もrenderer関連19/19・skip0、全305 PNG→OpenCV1,830/1,830、実Chromeの基準比較32/ロゴ機能18/店舗24ケースを再実行して成功。最初のrenderer独立レビュー後に発見した14失敗は追加TDDで修正し、最終差分も別contextで再レビューする。コードのmapping検証と、全payload/全物理条件の読取保証を混同しない。
+- 親もrenderer関連19/19・skip0、全305 PNG→OpenCV1,830/1,830、実Chromeの基準比較32/ロゴ機能18/店舗24ケースを再実行して成功。最初のrenderer独立レビュー後に発見した14失敗は追加TDDで修正し、最終差分も別contextで再レビューし合格した。コードのmapping検証と、全payload/全物理条件の読取保証を混同しない。
 
 追加の多版数実験は必須行列と区別する。v1/2/3/4/5/6/7/14の1,392 reader条件は1,298成功/94失敗で、ほとんどは装飾前H対照にも失敗がある。唯一の装飾のみ失敗（任意文字列A・v1・marugo-2・mask0・90度回転）は修正前とPNG byte一致の既存限界。アプリが使う現行形式v6の別token追加144条件は全成功。任意payloadや実機撮影/印刷の万能保証とはしない。
 
@@ -132,6 +142,6 @@ UI検証は架空のAPI境界で実際のReactコンポーネントを動かす�
 
 対象Supabaseは `Recipe-Management / hjhkccbktkscwtgzxjfq`。貸借管理 `mzismgyctulktrihcwfg`、LINE Reportの別プロジェクトとは区別する。反映は対象の権限を確認し、レビュー済みの対象マイグレーション1件 → `marugo-qr` Edge Function → Pages/静的PNGの順。既存QRやアクセス履歴をテストのために書き換えない。
 
-公開前に修正後のPC/スマホ画面を提示して承認を得る。マイグレーション適用・関数の配布版・Pagesのコミットと成功をそれぞれ読み戻し、承認後の全38公開PNGの通常/キャッシュ回避取得をローカルのSHA-256と比較する。
+この店舗追加は2026-10-17に明示的なデプロイ指示を受領済みで、追加の画面承認待ちはない。マイグレーション台帳・関数の配布版/ソース・Pagesのコミットと成功、全38公開PNGの通常/キャッシュ回避SHAをそれぞれ読み戻し、2026-10-18 JSTに公開を確認した。
 
 店舗23点の反映では追加validator migration 1件 → capability gateを持つ `marugo-qr` → フロント/38 PNGの順を守る。SNS migrationを再適用したり共用 `db push/reset` をしない。店舗ID保存後に旧v13 Edge/旧カタログ画面へ単純に戻すと互換保護を失うため、ロールバックは保存済み38 IDとcapability gateを解釈できる互換版で行う。列や保存済みロゴを削除せず、元コード・ファイル・アクセス履歴を維持する。既存のロゴ付きPNGはロゴ設定の変更・解除だけでは無効にならず、同じ転送先を使い続ける。

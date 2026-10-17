@@ -9,11 +9,11 @@
 
 ## 更新
 
-### 店舗ロゴ23点の追加（検証完了・ユーザー指示による本番反映準備）
+### 2026-10-18 JST 店舗ロゴ23点の追加（本番反映・公開確認済み）
 
-既存SNS15＋店舗23の38固定IDに対応。横長7点の旧14失敗は解消し、親も全1,830条件成功を確認。2026-10-17のユーザー「デプロイして」で本番反映を明示許可された。旧画面を保護するcatalog capabilityと、実PGでの共有保存/変更/解除・不変性は隔離検証済みですが、本番成功とは区別します。状態と全証跡は [中央ロゴ](docs/qr-logos.md) を参照。
+店舗23＋従来SNS15の38固定IDを公開済み。2026-10-17のユーザー「デプロイして」に基づき、独立レビューと親の全1,830復号成功を経てPR #52を統合しました。main `ee8ca957b69aef8aa1d763841258760a6b96db58`、Pages `39046605816` は成功。公開HTML/遅延JS/MJS/CSS/PNGの56ファイルを通常/キャッシュ回避の計112取得でCI成果物と照合し、PC/スマホの公開画面で39選択肢・作成/変更/再表示/解除・PNG同一URLを代替APIで確認しました。実利用者認証・本番業務レコードの試験登録・撮影/印刷は未検証です。状態と全証跡は [中央ロゴ](docs/qr-logos.md) を参照。
 
-承認後の対象は `Recipe-Management / hjhkccbktkscwtgzxjfq`、QR専用CLI profile `marugo-qr-release-20261017`。新しい `20261017204127_qr_store_logo_catalog.sql` **1件だけ**で既存validator allowlistを拡張 → capability gateを含む `marugo-qr` だけ → フロント/38 PNGの順で反映します。既存のSNS migrationは適用済みなので再適用せず、共用 `db push/reset` を使いません。列・他RPC・Storage・Auth・他Edgeや業務レコードを変更しません。反映直前/直後の定義・既存行指紋、Edgeの配布ソース、Pages SHA/成果物、全38 PNGの通常/キャッシュ回避SHAを個別に確認し、Obsidian/Graphifyも同期します。店舗IDが保存された後は旧v13/15点画面への単純セットロールバックを避け、保存IDと互換gateを扱える版を維持します。
+対象 `Recipe-Management / hjhkccbktkscwtgzxjfq` とQR専用CLI profile `marugo-qr-release-20261017` を確認し、新migration `20261017204127_qr_store_logo_catalog.sql` **1件だけ** → capability gate付き `marugo-qr` v14 → フロント/38 PNGの順で反映しました。正確な運用wrapperを隔離PGでリハーサルし、適用transaction内のQR17/ファイル11/履歴21の全既存フィールドと他定義の不変を確認。台帳/validator/RPC/権限を再読戻しし、EdgeはACTIVE/verify_jwt=false・全10ソース一致・他25関数不変を確認しました。SNS migration再適用・共用db push/reset・列/RPC/Storage/Auth/他Edge/業務レコードの変更はありません。ロールバックは保存済み38 IDとcapability gateを解釈する互換版で行い、旧v13/15点画面へ単純に戻して保護を失わないようにします。Obsidian/Graphifyは正本から更新し、知識のfreshness・リンク・内容も別途読み戻します。
 
 ### 2026-10-17 MARUGO QRの中央ロゴ（本番反映・公開確認済み）
 
