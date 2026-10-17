@@ -7,22 +7,26 @@ import { PNG } from "pngjs";
 const catalog =
   await import("../supabase/functions/_shared/qr-logos.mjs").catch(() => ({}));
 
-test("all 15 supplied logos have allowlisted compact local assets with verified provenance", () => {
+test("all 15 supplied SNS logos retain their compact local assets and verified provenance", () => {
+  const sns = catalog.QR_LOGOS.filter((logo) => logo.kind !== "store");
   assert.ok(
     Array.isArray(catalog.QR_LOGOS),
     "The supplied logos need a shared allowlisted catalog",
   );
-  assert.equal(catalog.QR_LOGOS.length, 15);
-  assert.equal(new Set(catalog.QR_LOGOS.map((logo) => logo.id)).size, 15);
+  assert.equal(sns.length, 15);
+  assert.equal(new Set(sns.map((logo) => logo.id)).size, 15);
   const manifest = JSON.parse(
     readFileSync(
       new URL("../docs/qr-logo-assets.json", import.meta.url),
       "utf8",
     ),
   );
-  assert.equal(manifest.entries.length, 15);
+  assert.equal(
+    manifest.entries.filter((entry) => !entry.id.startsWith("store-")).length,
+    15,
+  );
   let totalBytes = 0;
-  for (const logo of catalog.QR_LOGOS) {
+  for (const logo of sns) {
     assert.match(logo.id, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.equal(logo.file, `${logo.id}.png`);
     const entry = manifest.entries.find((value) => value.id === logo.id);

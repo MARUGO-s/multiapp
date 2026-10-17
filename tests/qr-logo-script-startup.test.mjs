@@ -38,7 +38,21 @@ const scripts = [
     directory: "qr-logo-ui-evidence",
     directories: ["screenshots", "browser-exports"],
   },
+  {
+    name: "test-qr-store-browser.mjs",
+    override: "QR_LOGO_EVIDENCE",
+    directory: "qr-store-browser",
+    directories: [],
+  },
 ];
+
+test("standard browser regression command includes the actual store-selection suite", () => {
+  const pkg = JSON.parse(readFileSync(path.join(repo, "package.json"), "utf8"));
+  const commands = pkg.scripts["test:qr-logo-browser"]
+    .split("&&")
+    .map((command) => command.trim());
+  assert.ok(commands.includes("node scripts/test-qr-store-browser.mjs"));
+});
 
 for (const script of scripts) {
   for (const explicitOutput of [false, true]) {

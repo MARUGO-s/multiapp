@@ -310,11 +310,11 @@ test("Logo picker renders every allowlisted image with native labeled radio cont
   );
   const h = harness("QrLogoPicker");
   const radios = h.all((n) => n.type === "input" && n.props.type === "radio");
-  assert.equal(radios.length, 16);
+  assert.equal(radios.length, 39);
   assert.equal(new Set(radios.map((n) => n.props.name)).size, 1);
   assert.equal(radios[0].props.checked, true);
   const images = h.all((n) => n.type === "img");
-  assert.equal(images.length, 15);
+  assert.equal(images.length, 38);
   for (const logo of logos.QR_LOGOS) {
     const label = h.find(
       (n) =>
@@ -338,7 +338,9 @@ test("Logo picker renders every allowlisted image with native labeled radio cont
         .some((n) => n?.props?.children === logo.label),
     );
   }
-  radios[1].props.onChange();
+  radios
+    .find((radio) => radio.props.value === logos.QR_LOGOS[0].id)
+    .props.onChange();
   assert.equal(h.props.value, logos.QR_LOGOS[0].id);
   assert.equal(
     h
@@ -371,6 +373,72 @@ test("Logo gallery styling keeps compact disclosures, fluid choices and visible 
   assert.match(
     css,
     /\.qr-create-card\s*>\s*\.qr-logo-picker\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/,
+  );
+});
+
+test("Store and SNS galleries retain one controlled radio selection and bounded non-cropping artwork", () => {
+  const h = harness("QrLogoPicker");
+  const groups = h.all(
+    (n) => n.props?.role === "group" && n.props?.["aria-label"],
+  );
+  assert.deepEqual(
+    groups.map((n) => n.props["aria-label"]),
+    ["店舗ロゴ", "SNSロゴ"],
+  );
+  assert.equal(
+    h.all((n) => n.type === "input" && n.props.type === "radio", groups[0])
+      .length,
+    23,
+  );
+  assert.equal(
+    h.all((n) => n.type === "input" && n.props.type === "radio", groups[1])
+      .length,
+    15,
+  );
+  const store = h.find(
+    (n) => n.type === "input" && n.props.value === "store-marugo-2",
+  );
+  store.props.onChange();
+  assert.equal(h.props.value, "store-marugo-2");
+  assert.equal(h.all((n) => n.type === "input" && n.props.checked).length, 1);
+  h.props.disabled = true;
+  h.find(
+    (n) => n.type === "input" && n.props.value === "store-yakiniku",
+  ).props.onChange();
+  assert.equal(h.props.value, "store-marugo-2");
+  const css = readFileSync(new URL("../src/qr.css", import.meta.url), "utf8");
+  assert.match(
+    css,
+    /\.qr-logo-categories\s*\{[^}]*max-height:[^}]*overflow-y:\s*auto;/,
+  );
+  assert.match(
+    css,
+    /\.qr-logo-option-store img\s*\{[^}]*object-fit:\s*contain;/,
+  );
+});
+
+test("Unknown saved artwork remains explicit and unchanged instead of crashing or silently becoming no-logo", () => {
+  const h = harness("QrLogoPicker", { props: { value: "future-store-logo" } });
+  assert.equal(h.props.value, "future-store-logo");
+  assert.ok(h.find((n) => n.props?.role === "alert"));
+  const kept = h.find(
+    (n) => n.type === "input" && n.props.value === "future-store-logo",
+  );
+  assert.ok(kept.props.checked);
+  assert.ok(kept.props.disabled);
+  assert.equal(h.all((n) => n.type === "input" && n.props.checked).length, 1);
+  assert.equal(
+    h.find((n) => n.type === "input" && n.props.value === "").props.checked,
+    false,
+  );
+  h.find(
+    (n) => n.type === "input" && n.props.value === "store-mitan",
+  ).props.onChange();
+  assert.equal(h.props.value, "store-mitan");
+  assert.equal(
+    h.all((n) => n.type === "input" && n.props.value === "future-store-logo")
+      .length,
+    0,
   );
 });
 

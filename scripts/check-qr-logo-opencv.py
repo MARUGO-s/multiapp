@@ -25,7 +25,7 @@ for entry in manifest["images"]:
     }
     for name, image in transforms.items():
         decoded, corners, _ = cv2.QRCodeDetector().detectAndDecode(image)
-        results.append({"id": entry["id"], "transform": name, "passed": decoded == entry["text"], "detected": corners is not None, "decoded": decoded})
+        results.append({"id": entry["id"], "file": entry["file"], "maskPattern": entry.get("maskPattern"), "transform": name, "passed": decoded == entry["text"], "detected": corners is not None, "decoded": decoded})
 report = {"decoder": "OpenCV", "version": cv2.__version__, "imageCount": len(manifest["images"]), "caseCount": len(results), "passed": sum(row["passed"] for row in results), "failed": sum(not row["passed"] for row in results), "cases": results, "limitations": "Software image decoding only, not a phone-camera/print guarantee. No URL was opened and no scan was recorded."}
 (args.directory / "opencv-results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
 print(json.dumps({key: report[key] for key in ["decoder", "version", "imageCount", "caseCount", "passed", "failed"]}, ensure_ascii=False))

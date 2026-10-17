@@ -3,6 +3,10 @@ import { buildTrackingUrl } from "./qr-routing.mjs";
 import { createContext, useContext, useMemo } from "react";
 import { qrCredentials } from "./qr-account-client";
 import { scopedQrPath } from "./qr-account-routing.mjs";
+import {
+  QR_LOGO_CATALOG_HEADER,
+  QR_LOGO_CATALOG_VALUE,
+} from "../supabase/functions/_shared/qr-logos.mjs";
 
 export const QrScopeContext = createContext<{
   storeId: string;
@@ -101,6 +105,7 @@ export async function qrApi<T>(
       ...options,
       headers: {
         "Content-Type": "application/json",
+        [QR_LOGO_CATALOG_HEADER]: QR_LOGO_CATALOG_VALUE,
         apikey: SUPABASE_PUBLISHABLE_KEY,
         Authorization: `Bearer ${credentials.token}`,
       },

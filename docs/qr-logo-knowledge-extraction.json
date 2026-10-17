@@ -77,7 +77,7 @@
     },
     {
       "id": "docs_qr_logos_logo_limit",
-      "label": "ロゴ外側白地を含め幅22%以下（初回18%から拡大）",
+      "label": "承認済みSNS15点は白地込み幅22%以下（店舗拡大は別方針）",
       "file_type": "rationale",
       "source": "docs/qr-logos.md",
       "selector": {
@@ -144,14 +144,30 @@
       "selector": { "kind": "section", "text": "## 反映とロールバック" }
     },
     {
+      "id": "docs_qr_logos_store_policy",
+      "label": "店舗23点の安全条件内最大化・疑似finder回避",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "### 店舗23点の拡大方針" }
+    },
+    {
       "id": "docs_qr_logo_assets_doc",
-      "label": "中央ロゴ15素材の原本とPNGハッシュ台帳",
+      "label": "中央ロゴ38素材（店舗23＋SNS15）の原本とPNGハッシュ台帳",
       "file_type": "document",
       "source": "docs/qr-logo-assets.json",
       "selector": { "kind": "document", "text": "\"schemaVersion\": 1" }
     }
   ],
   "edges": [
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_store_policy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "### 店舗23点の拡大方針"
+    },
     {
       "source": "docs_qr_logos_doc",
       "target": "docs_qr_logos_status",

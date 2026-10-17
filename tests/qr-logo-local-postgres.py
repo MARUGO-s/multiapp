@@ -4,7 +4,8 @@
 Uses an already-installed Docker image (never pulls), no Supabase configuration,
 no real credentials, no host ports. DB files and saved logs remain under Hermes
 scratch; container is always stopped and removed. Safe baseline RED mode skips
-only the new migration: --baseline. Extra SQL paths are repository-relative.
+the original logo migration: --baseline; --store-baseline skips only the additive
+store catalog extension. Extra SQL paths are repository-relative.
 """
 from __future__ import annotations
 
@@ -22,12 +23,14 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "supabase/migrations"
 TARGET = MIGRATIONS / "20261017100000_qr_logo_selection.sql"
+STORE_TEST = ROOT / "tests/qr-store-logo-database.sql"
 SCRATCH = Path.home() / ".hermes/cache/scratch"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--store-baseline", action="store_true", help="exercise store-logo tests against the old SNS-only validator")
     parser.add_argument("--sql", action="append", help="SQL test relative to repository; defaults to logo tests")
     parser.add_argument("--concurrency", action="store_true", help="also exercise real row locks and competing first completions")
     parser.add_argument("--log-dir", type=Path)
@@ -102,7 +105,17 @@ def main() -> None:
             sql(TARGET.read_text())
         else:
             print("New migration skipped/absent: testing pre-feature baseline", flush=True)
+        if not args.baseline and TARGET.exists() and STORE_TEST.exists():
+            print("Seeding pre-extension SNS rows and catalog snapshots", flush=True)
+            sql("\\set qr_store_logo_before true\n" + STORE_TEST.read_text())
+            if not args.store_baseline:
+                for migration in sorted(MIGRATIONS.glob("*_qr_store_logo_catalog.sql")):
+                    print("Applying " + migration.name, flush=True)
+                    sql(migration.read_text())
+            else:
+                print("Store catalog migration skipped: testing SNS-only baseline", flush=True)
         for test in args.sql or [
+            "tests/qr-store-logo-database.sql",
             "tests/qr-logo-database.sql", "tests/qr-logo-files-database.sql",
             "tests/qr-logo-regression-database.sql", "tests/qr-files.sql", "tests/qr-trash.sql",
             "tests/qr-analytics.sql", "tests/qr-unique.sql", "tests/qr-accounts.sql",
