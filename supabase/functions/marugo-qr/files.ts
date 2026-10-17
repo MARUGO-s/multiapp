@@ -2,6 +2,7 @@ import {
   fileSpecification,
   matchesFileSignature,
 } from "../_shared/qr-files.mjs";
+import { validateLogoId } from "../_shared/qr-logos.mjs";
 
 export class FileError extends Error {
   constructor(
@@ -135,7 +136,11 @@ export async function prepareFile(
     p_operation: "init",
     p_owner: owner,
     p_id: input.id,
-    p_payload: { title: input.title.trim(), ...spec },
+    p_payload: {
+      title: input.title.trim(),
+      ...spec,
+      logoId: validateLogoId(input.logoId),
+    },
   });
   if (file.link) return { link: file.link };
   // A retry after an uncertain upload skips the upload if a valid object exists.

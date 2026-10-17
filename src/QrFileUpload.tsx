@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FileUp, LoaderCircle } from "lucide-react";
 import { useQrApi, type QrLink } from "./qr-api";
 import { isFileDrag, selectedQrFile } from "./qr-file-selection.mjs";
+import { QrLogoPicker } from "./QrLogoPicker";
 import {
   fileSpecification,
   matchesFileSignature,
@@ -43,10 +44,16 @@ export function QrFileUpload({
   onCreated,
   onBusy,
   busy,
+  logoId = null,
+  onLogoChange,
+  onPendingChange,
 }: {
   onCreated: (link: QrLink) => void;
   onBusy: (busy: boolean) => void;
   busy: boolean;
+  logoId?: string | null;
+  onLogoChange?: (logoId: string | null) => void;
+  onPendingChange?: (pending: boolean) => void;
 }) {
   const qrApi = useQrApi();
   const [title, setTitle] = useState("");
@@ -58,10 +65,16 @@ export function QrFileUpload({
   const [pending, setPending] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
-  const attempt = useRef<{ id: string; file: File; title: string } | null>(
-    null,
-  );
+  const attempt = useRef<{
+    id: string;
+    file: File;
+    title: string;
+    logoId: string | null;
+  } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
   useEffect(() => {
     // Dropping outside the box must not navigate away from the application.
     const preventFileNavigation = (event: DragEvent) => {
@@ -106,11 +119,12 @@ export function QrFileUpload({
     setError("");
     onBusy(true);
     try {
-      const spec = fileSpecification(file.name, file.size);
+      const snapshot = attempt.current || { file, title: title.trim(), logoId };
+      const spec = fileSpecification(snapshot.file.name, snapshot.file.size);
       if (
         !matchesFileSignature(
           spec.mime,
-          new Uint8Array(await file.slice(0, 32).arrayBuffer()),
+          new Uint8Array(await snapshot.file.slice(0, 32).arrayBuffer()),
         )
       )
         throw new Error(
@@ -119,8 +133,7 @@ export function QrFileUpload({
       if (!attempt.current)
         attempt.current = {
           id: crypto.randomUUID(),
-          file,
-          title: title.trim(),
+          ...snapshot,
         };
       setPending(true);
       setStatus("保存先を準備しています…");
@@ -136,6 +149,7 @@ export function QrFileUpload({
         body: JSON.stringify({
           id,
           title: attempt.current.title,
+          logoId: attempt.current.logoId,
           ...spec,
           publishConfirmed: true,
         }),
@@ -148,7 +162,7 @@ export function QrFileUpload({
           setStatus("アップロード中です。画面を閉じないでください。");
           await uploadFile(
             prepared.uploadUrl,
-            file,
+            attempt.current.file,
             prepared.mime,
             setProgress,
           );
@@ -286,6 +300,13 @@ export function QrFileUpload({
           />
         </div>
       </div>
+      <QrLogoPicker
+        value={pending && attempt.current ? attempt.current.logoId : logoId}
+        onChange={(value) => {
+          if (!busy && !pending) onLogoChange?.(value);
+        }}
+        disabled={busy || pending}
+      />
       {file && (
         <p className="qr-file-summary">
           {file.name}（{(file.size / 1024 / 1024).toFixed(2)} MB）

@@ -1,5 +1,6 @@
 import { AccountError, qrScope } from "../_shared/qr-account-auth.ts";
 import { validVisitorId, visitorHash } from "../_shared/qr-visitor.mjs";
+import { validateLogoId } from "../_shared/qr-logos.mjs";
 import {
   FileError,
   publicFile,
@@ -119,6 +120,7 @@ async function rpc(name: string, args: unknown) {
   });
   const data = await response.json();
   if (!response.ok) {
+    if (data.message === "INVALID_LOGO") throw new Error("INVALID_LOGO");
     if (data.message === "NOT_FOUND") {
       throw new ApiError(404, "このQRコードは見つかりません。");
     }
@@ -306,15 +308,30 @@ export async function handler(req: Request): Promise<Response> {
             code,
             title: input.title.trim(),
             targetUrl: normalizeTarget(input.targetUrl),
+            logoId: validateLogoId(input.logoId),
           },
         }),
         201,
       );
     }
     const match = route.match(
-      /^\/links\/([^/]+)(\/history|\/analytics|\/trash|\/restore)?$/,
+      /^\/links\/([^/]+)(\/history|\/analytics|\/trash|\/restore|\/logo)?$/,
     );
     if (match && uuid.test(match[1])) {
+      if (match[2] === "/logo" && req.method === "PATCH") {
+        const input = await body(req);
+        if (!Object.hasOwn(input, "logoId")) {
+          throw new ApiError(400, "ロゴの指定が必要です。");
+        }
+        return json(
+          await rpc("kotonoha_qr", {
+            ...args,
+            p_operation: "logo",
+            p_id: match[1],
+            p_payload: { logoId: validateLogoId(input.logoId) },
+          }),
+        );
+      }
       if (
         (match[2] === "/trash" || match[2] === "/restore") &&
         req.method === "POST"
@@ -389,6 +406,9 @@ export async function handler(req: Request): Promise<Response> {
     }
     return json({ error: "ページが見つかりません。" }, 404);
   } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_LOGO") {
+      return json({ error: "ロゴの指定が正しくありません。" }, 400);
+    }
     if (
       error instanceof ApiError ||
       error instanceof FileError ||

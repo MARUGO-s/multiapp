@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "inputCount": 15,
+  "assetCount": 15,
+  "assetTotalBytes": 58834,
+  "notes": [
+    "Provided SNS_logo catalog. Source filenames preserved exactly; PNG derivatives are the only publicly served artwork.",
+    "Inkscape 1.4 offline sandbox rendering for SVG, Pillow RGBA metadata removal; no source modification.",
+    "Source rights and any required brand/Icons8 attribution have not been independently verified."
+  ],
+  "entries": [
+    {
+      "id": "instagram-black",
+      "sourceFilename": "Instagram_Glyph_Black.svg",
+      "sourceSha256": "a036f8197b3856b02d1e236e08dd1b50a4ed68cb148686beb274eabf29794d51",
+      "sourceBytes": 1759,
+      "assetSha256": "cfcbebe29060b46d26734ae8719b6a11733f5d7c9551ee6a5dd24a67c2faedde",
+      "assetBytes": 5726,
+      "dimensions": [128, 128]
+    },
+    {
+      "id": "instagram-gradient",
+      "sourceFilename": "Instagram_Glyph_Gradient.svg",
+      "sourceSha256": "d193889efcbd28c593c010fc66f6ab639ae369064f4f0861daff7f589f1b38b1",
+      "sourceBytes": 10896171,
+      "assetSha256": "f8ffea7a2fc5c245f65acf027025e20334132c7bfdd58c2d66a2acde92f62bf0",
+      "assetBytes": 17070,
+      "dimensions": [128, 128]
+    },
+    {
+      "id": "instagram-white",
+      "sourceFilename": "Instagram_Glyph_White.svg",
+      "sourceSha256": "3347813e9e8f082cdf48495818bd370ccff94b687efb8aa1c8a7b36cfcfb8291",
+      "sourceBytes": 1819,
+      "assetSha256": "44e0b398276b65de37c7a25ef2ed25569ca407c909e58d44a26461f9538dbab5",
+      "assetBytes": 6463,
+      "dimensions": [128, 128]
+    },
+    {
+      "id": "line-android",
+      "sourceFilename": "LINE_APP_Android.png",
+      "sourceSha256": "cf89a2df7dba6c191bd9e1101ab680f086b1619371972d7e86eaa49e003a83a8",
+      "sourceBytes": 27687,
+      "assetSha256": "2228a0e5e589d551ca430f4604525de2d4a9d5e4f57bdb6819196b1f9cfeb657",
+      "assetBytes": 9939,
+      "dimensions": [128, 128]
+    },
+    {
+      "id": "line-ios",
+      "sourceFilename": "LINE_APP_iOS.png",
+      "sourceSha256": "5e93437eb5ec0dcdece92d1562fcd435d1d521cca5c013d2d9e15b544a1d8a39",
+      "sourceBytes": 22239,
+      "assetSha256": "3ecbfc4504440d5b16b92395948dd3a29dd2f56a870c35af83d9e2b6caa620f6",
+      "assetBytes": 7301,
+      "dimensions": [128, 128]
+    },
+    {
+      "id": "line-icons8-100",
+      "sourceFilename": "icons8-line-100.png",
+      "sourceSha256": "269e2f94135808a1a568f712b89a1b2999ea8602ffdc35114ceb4e733e026956",
+      "sourceBytes": 2002,
+      "assetSha256": "2bb2feb867ec785278210d4ffb6856312c7bdae731f05c7c60446edf522456fe",
+      "assetBytes": 1954,
+      "dimensions": [100, 100]
+    },
+    {
+      "id": "line-icons8-50",
+      "sourceFilename": "icons8-line-50.png",
+      "sourceSha256": "a63c3eea37a5b45c3d35078679c73a2826c4749dfc13cc15b821aceb055425f1",
+      "sourceBytes": 959,
+      "assetSha256": "5d9b9f4632516be62503d3db3465eebf6cc75d0507226c1846c76fcc914f09df",
+      "assetBytes": 924,
+      "dimensions": [50, 50]
+    },
+    {
+      "id": "instagram-icons8-100",
+      "sourceFilename": "icons8-インスタグラム-100.png",
+      "sourceSha256": "206a597acefe3f0ff682a42a7bd750ac862cff6437958587674d5847b3bacd5e",
+      "sourceBytes": 1895,
+      "assetSha256": "7363a1c2f1cc3b794bbef4e9a99f092609ae45043a09c15658decdcfc4411287",
+      "assetBytes": 1950,
+      "dimensions": [100, 100]
+    },
+    {
+      "id": "instagram-icons8-50",
+      "sourceFilename": "icons8-インスタグラム-50.png",
+      "sourceSha256": "17f84a43418cab7bf504c53dc052c64aa20c9790fb4ef7b09e71a0599fed308d",
+      "sourceBytes": 889,
+      "assetSha256": "b418cea3151b20f6db9f67b37d07c82cc710eacfdfba02b4473266d2efed5e67",
+      "assetBytes": 903,
+      "dimensions": [50, 50]
+    },
+    {
+      "id": "x-icons8-100",
+      "sourceFilename": "icons8-ツイッターx-100.png",
+      "sourceSha256": "fb28ca4921ebdc252bc6a5e644916e5295b63955aa093fd5e81565c5c2e20563",
+      "sourceBytes": 1787,
+      "assetSha256": "de39b17b0d7413853afcc9bc173c4d66b47c874482ee6079fbad7e54ddb0b9a4",
+      "assetBytes": 1765,
+      "dimensions": [100, 100]
+    },
+    {
+      "id": "x-icons8-50",
+      "sourceFilename": "icons8-ツイッターx-50.png",
+      "sourceSha256": "228aa6424002ad56dc6e050f8867ff51e0e08c0007a84ba03e88abcc51965b46",
+      "sourceBytes": 913,
+      "assetSha256": "3a43e5655feca6c2c379fe8ad6cbb9ffeee60a52f88581fc7afb88659f6bf24c",
+      "assetBytes": 882,
+      "dimensions": [50, 50]
+    },
+    {
+      "id": "facebook-icons8-100",
+      "sourceFilename": "icons8-フェイスブック-100.png",
+      "sourceSha256": "5604ecec1b0da8494eef94bc9dd6c1bc139044695510272fe95e31be5315d185",
+      "sourceBytes": 1006,
+      "assetSha256": "2fbbae8718ed1644a2fd925e2a7c7fa33c41f193118ca329f6c463a7753b9046",
+      "assetBytes": 987,
+      "dimensions": [100, 100]
+    },
+    {
+      "id": "facebook-icons8-48",
+      "sourceFilename": "icons8-フェイスブック-48.png",
+      "sourceSha256": "c363ca4119ca8d801c55c387b9efacea74cef70982bac8e1b69db5ba8d0dbf46",
+      "sourceBytes": 943,
+      "assetSha256": "ab09619ffc693a05faa550a756e7ef4be0477385f7570fa4976773f356161397",
+      "assetBytes": 876,
+      "dimensions": [48, 48]
+    },
+    {
+      "id": "facebook-icons8-50",
+      "sourceFilename": "icons8-フェイスブック-50.png",
+      "sourceSha256": "89b0ff3d1b8d4babb8f0d0d57f28c803a3c44990d47346b3fe301f650ba99046",
+      "sourceBytes": 487,
+      "assetSha256": "645a90099f50c4262025b59ced33b7b437d2046e7b2e5108b7de35a3956463dd",
+      "assetBytes": 472,
+      "dimensions": [50, 50]
+    },
+    {
+      "id": "facebook-icons8-96",
+      "sourceFilename": "icons8-フェイスブック-96.png",
+      "sourceSha256": "7c5bea32e20848f9858d36cd547bb6596abc11dd35d7766cb2fa85a09cc4fa5a",
+      "sourceBytes": 1862,
+      "assetSha256": "cf969cd802e68bc262387446743438f1e95254e3ae5f50bcfa6f15ca5cc03ae7",
+      "assetBytes": 1622,
+      "dimensions": [96, 96]
+    }
+  ]
+}

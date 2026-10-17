@@ -66,6 +66,7 @@ function harness() {
         return { FileUp: () => null, LoaderCircle: () => null };
       if (name.endsWith("qr-files.mjs")) return validation;
       if (name.endsWith("qr-file-selection.mjs")) return selection;
+      if (name === "./QrLogoPicker") return { QrLogoPicker: () => null };
       if (name === "./qr-api")
         return {
           useQrApi: () => async (path, options) => {
