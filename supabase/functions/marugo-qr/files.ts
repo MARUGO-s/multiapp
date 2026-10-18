@@ -2,6 +2,7 @@ import {
   fileSpecification,
   matchesFileSignature,
 } from "../_shared/qr-files.mjs";
+import { storeNamePayload } from "../_shared/qr-store-name.mjs";
 import { validateLogoId } from "../_shared/qr-logos.mjs";
 
 export class FileError extends Error {
@@ -140,6 +141,7 @@ export async function prepareFile(
       title: input.title.trim(),
       ...spec,
       logoId: validateLogoId(input.logoId),
+      ...storeNamePayload(input),
     },
   });
   if (file.link) return { link: file.link };

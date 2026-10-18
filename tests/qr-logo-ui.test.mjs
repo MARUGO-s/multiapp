@@ -8,6 +8,8 @@ import * as jsx from "react/jsx-runtime";
 import * as files from "../supabase/functions/_shared/qr-files.mjs";
 import * as selection from "../src/qr-file-selection.mjs";
 import * as logos from "../supabase/functions/_shared/qr-logos.mjs";
+import * as storeNames from "../supabase/functions/_shared/qr-store-name.mjs";
+const StoreNameField = function QrStoreNameField() {};
 
 const LogoPicker = function QrLogoPicker() {};
 const FileUpload = function QrFileUpload() {};
@@ -184,6 +186,18 @@ function harness(component = "QrPage", options = {}) {
           useQrApi: () => api,
           trackingUrl: (code, source) =>
             `https://local.test/multiapp/?s=${source === "qr" ? "q" : "b"}#${code}`,
+        };
+      if (name.endsWith("qr-store-name.mjs")) return storeNames;
+      if (name === "./QrStoreNameField")
+        return { QrStoreNameField: StoreNameField };
+      if (name === "./qr-caption.mjs")
+        return {
+          qrImageWithStoreNameDataUrl: (...args) => {
+            images.push(args);
+            return state.image
+              ? state.image(...args)
+              : Promise.resolve(`data:image/png;local,${args[1] || "none"}`);
+          },
         };
       if (name === "./qr-image.mjs")
         return {
@@ -465,6 +479,7 @@ test("URL creation snapshots the selected logo and unchanged retries reuse the r
     title: "秋のお知らせ",
     targetUrl: "https://example.test/autumn",
     logoId: "instagram-gradient",
+    storeName: null,
   });
   assert.deepEqual(bodies[1], bodies[0]);
   creationPicker(h).props.onChange("line-ios");
@@ -538,7 +553,7 @@ test("Detail logo edits stay drafts across polling and save only the server-conf
   assert.equal(request.path, "/links/link-a/logo");
   assert.deepEqual(plain(request.options), {
     method: "PATCH",
-    body: JSON.stringify({ logoId: "line-ios" }),
+    body: JSON.stringify({ logoId: "line-ios", storeName: null }),
   });
   saving.resolve(row({ logo_id: "line-ios", scan_count: 24 }));
   await result;
@@ -653,7 +668,10 @@ test("Logo removal failures keep the saved image and draft until an explicit ser
     "data:image/png;local,none",
   );
   for (const call of h.calls.filter((c) => c.path?.endsWith("/logo")))
-    assert.deepEqual(JSON.parse(call.options.body), { logoId: null });
+    assert.deepEqual(JSON.parse(call.options.body), {
+      logoId: null,
+      storeName: null,
+    });
 });
 
 test("Stored logos regenerate through the verified renderer and old PNGs disappear before effects", async () => {
@@ -678,6 +696,7 @@ test("Stored logos regenerate through the verified renderer and old PNGs disappe
     "https://local.test/multiapp/?s=q#abcdefgh1234",
     "instagram-gradient",
     "/multiapp/",
+    null,
   ]);
   let download = h.find((n) => n.type === "a" && n.props.download);
   assert.equal(download.props.href, "data:image/png;local,instagram-gradient");
@@ -890,6 +909,218 @@ test("Pending file attempts lock the shared creation picker until discard is con
   assert.equal(upload.picker().props.disabled, false);
   fileForm().props.onPendingChange(false);
   assert.equal(creationPicker(page).props.disabled, false);
+});
+
+test("Store caption field defaults only for stores, permits hiding and validates Unicode codepoints", () => {
+  assert.ok(
+    existsSync(new URL("../src/QrStoreNameField.tsx", import.meta.url)),
+    "store caption input implemented",
+  );
+  const h = harness("QrStoreNameField", {
+    props: { logoId: "store-marugo-2", value: null },
+  });
+  const input = () => h.find((n) => n.type === "input");
+  assert.equal(
+    input().props.value,
+    logos.QR_LOGOS.find((l) => l.id === "store-marugo-2").label,
+  );
+  input().props.onChange({ target: { value: "" } });
+  assert.equal(input().props.value, "");
+  h.props.value = "𠮷".repeat(80);
+  assert.equal(input().props["aria-invalid"], false);
+  h.props.value += "A";
+  assert.equal(input().props["aria-invalid"], true);
+  h.props.value = "bad\u0085name";
+  assert.equal(input().props["aria-invalid"], true);
+  h.props.logoId = "instagram-black";
+  assert.equal(input(), null);
+  h.props.logoId = null;
+  assert.equal(input(), null);
+  h.props.logoId = "future-logo";
+  assert.equal(input(), null);
+});
+
+const captionField = (h, detail = false) =>
+  h.find(
+    (n) =>
+      n.type === StoreNameField &&
+      (n.props.label === "登録済みQRの店舗名") === detail,
+  );
+
+test("Store caption URL draft survives same selection and failures; caption changes request identity", async () => {
+  const h = harness("QrPage", {
+    api(path) {
+      if (path === "/links") throw new Error("offline");
+    },
+  });
+  await h.settle();
+  urlFields(h);
+  creationPicker(h).props.onChange("store-marugo-2");
+  assert.ok(captionField(h), "URL creation offers a store caption field");
+  assert.equal(captionField(h).props.value, null);
+  captionField(h).props.onChange("  新宿店 MARUGO  ");
+  creationPicker(h).props.onChange("store-marugo-2");
+  assert.equal(captionField(h).props.value, "  新宿店 MARUGO  ");
+  await submit(h);
+  await submit(h);
+  const bodies = () =>
+    h.calls
+      .filter((c) => c.path === "/links")
+      .map((c) => JSON.parse(c.options.body));
+  assert.equal(bodies()[0].storeName, "新宿店 MARUGO");
+  assert.deepEqual(bodies()[0], bodies()[1]);
+  captionField(h).props.onChange("");
+  await submit(h);
+  assert.equal(bodies()[2].storeName, "");
+  assert.notEqual(bodies()[2].id, bodies()[0].id);
+  creationPicker(h).props.onChange("store-mitan");
+  assert.equal(captionField(h).props.value, null);
+  creationPicker(h).props.onChange("line-ios");
+  await submit(h);
+  assert.equal(bodies().at(-1).storeName, null);
+});
+
+test("Store caption registered draft requires matching confirmed metadata and ignores stale lists", async () => {
+  let response;
+  const stale = deferred();
+  let hold = false;
+  const original = row({ logo_id: "store-marugo-2", store_name: null });
+  const h = harness("QrPage", {
+    rows: [original],
+    api(path) {
+      if (path.endsWith("/logo")) {
+        if (response instanceof Error) throw response;
+        return response;
+      }
+      if (path.startsWith("/links?") && hold) {
+        hold = false;
+        return stale.promise;
+      }
+    },
+    image: (_text, _logo, _base, name) => Promise.resolve(`png:${name}`),
+  });
+  await h.settle();
+  chooseRow(h);
+  await h.settle();
+  assert.ok(captionField(h, true), "registered QR has editable caption");
+  const png = () =>
+    h.find((n) => n.type === "a" && n.props.download).props.href;
+  assert.equal(png(), "png:null");
+  captionField(h, true).props.onChange("  新宿店  ");
+  detailPicker(h).props.onChange("store-marugo-2");
+  h.poll();
+  await h.settle();
+  assert.equal(captionField(h, true).props.value, "  新宿店  ");
+  assert.equal(png(), "png:null", "unsaved caption never leaks into PNG");
+  for (const bad of [
+    new Error("expired"),
+    row({ ...original, store_name: "wrong" }),
+    row({ ...original, code: "wrong", store_name: "新宿店" }),
+    row({ ...original, id: "wrong", store_name: "新宿店" }),
+    row({ ...original, logo_id: "store-mitan", store_name: "新宿店" }),
+  ]) {
+    response = bad;
+    await button(h, "ロゴを保存").props.onClick();
+    await h.settle();
+    assert.ok(h.find((n) => n.props?.role === "alert"));
+    assert.equal(captionField(h, true).props.value, "  新宿店  ");
+    assert.equal(png(), "png:null");
+    assert.equal(h.notices.length, 0);
+  }
+  response = row({ ...original, store_name: "新宿店" });
+  hold = true;
+  h.poll();
+  await button(h, "ロゴを保存").props.onClick();
+  stale.resolve({ links: [original], total: 1 });
+  await h.settle();
+  assert.equal(captionField(h, true).props.value, "新宿店");
+  assert.equal(png(), "png:新宿店");
+  assert.equal(button(h, "ロゴを保存").props.disabled, true);
+  const body = JSON.parse(
+    h.calls.filter((c) => c.path?.endsWith("/logo")).at(-1).options.body,
+  );
+  assert.deepEqual(body, { logoId: "store-marugo-2", storeName: "新宿店" });
+  captionField(h, true).props.onChange("");
+  response = row({ ...original, store_name: "" });
+  await button(h, "ロゴを保存").props.onClick();
+  await h.settle();
+  assert.equal(png(), "png:");
+  detailPicker(h).props.onChange("store-mitan");
+  assert.equal(captionField(h, true).props.value, null);
+});
+
+test("Store caption saved-name-only changes invalidate PNG before effects and discard late renders", async () => {
+  const late = deferred();
+  const original = row({ logo_id: "store-marugo-2", store_name: "first" });
+  const h = harness("QrPage", {
+    rows: [original],
+    image: (_text, _logo, _base, name) =>
+      name === "slow" ? late.promise : Promise.resolve(`png:${name}`),
+  });
+  await h.settle();
+  chooseRow(h);
+  await h.settle();
+  const download = (tree) =>
+    h.find((n) => n.type === "a" && n.props.download, tree);
+  assert.equal(download().props.href, "png:first");
+  h.state.rows = [row({ ...original, store_name: "slow" })];
+  h.poll();
+  await tick();
+  assert.equal(
+    download(h.paint()).props.href,
+    undefined,
+    "saved caption participates in render key",
+  );
+  h.flushEffects();
+  await h.settle();
+  h.state.rows = [row({ ...original, store_name: "latest" })];
+  h.poll();
+  await h.settle();
+  assert.equal(download().props.href, "png:latest");
+  late.resolve("png:slow");
+  await h.settle();
+  assert.equal(download().props.href, "png:latest");
+});
+
+test("Store caption file attempt freezes its first caption despite later props and preserves retry identity", async () => {
+  const h = harness("QrFileUpload", {
+    props: {
+      logoId: "store-marugo-2",
+      storeName: "  新宿店  ",
+      onStoreNameChange(value) {
+        h.props.storeName = value;
+      },
+    },
+    api(path) {
+      if (path === "/uploads") throw new Error("unknown");
+    },
+  });
+  selectFile(h, pdf());
+  assert.ok(captionField(h), "file creation offers a caption field");
+  await h.render().props.onSubmit({ preventDefault() {} });
+  await h.settle();
+  const first = JSON.parse(
+    h.calls.find((c) => c.path === "/uploads").options.body,
+  );
+  assert.equal(first.storeName, "新宿店");
+  h.props.storeName = "later";
+  h.props.logoId = "store-mitan";
+  assert.equal(captionField(h).props.value, "新宿店");
+  assert.equal(captionField(h).props.disabled, true);
+  captionField(h).props.onChange("cannot edit");
+  await h.render().props.onSubmit({ preventDefault() {} });
+  const retry = JSON.parse(
+    h.calls.filter((c) => c.path === "/uploads").at(-1).options.body,
+  );
+  assert.deepEqual(retry, first);
+  const page = harness();
+  await page.settle();
+  creationPicker(page).props.onChange("store-marugo-2");
+  captionField(page).props.onChange("shared caption");
+  const upload = page.find((n) => n.type === FileUpload);
+  assert.equal(upload.props.storeName, "shared caption");
+  upload.props.onStoreNameChange("file draft");
+  assert.equal(captionField(page).props.value, "file draft");
 });
 
 test("File publication freezes logo, title and file for same-ID retries and bodyless completion", async () => {

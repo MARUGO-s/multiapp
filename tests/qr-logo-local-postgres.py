@@ -5,7 +5,8 @@ Uses an already-installed Docker image (never pulls), no Supabase configuration,
 no real credentials, no host ports. DB files and saved logs remain under Hermes
 scratch; container is always stopped and removed. Safe baseline RED mode skips
 the original logo migration: --baseline; --store-baseline skips only the additive
-store catalog extension. Extra SQL paths are repository-relative.
+store catalog extension; --caption-baseline skips only the caption migration.
+Extra SQL paths are repository-relative.
 """
 from __future__ import annotations
 
@@ -30,6 +31,7 @@ SCRATCH = Path.home() / ".hermes/cache/scratch"
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--caption-baseline", action="store_true", help="skip only the store caption migration for RED")
     parser.add_argument("--store-baseline", action="store_true", help="exercise store-logo tests against the old SNS-only validator")
     parser.add_argument("--sql", action="append", help="SQL test relative to repository; defaults to logo tests")
     parser.add_argument("--concurrency", action="store_true", help="also exercise real row locks and competing first completions")
@@ -114,12 +116,26 @@ def main() -> None:
                     sql(migration.read_text())
             else:
                 print("Store catalog migration skipped: testing SNS-only baseline", flush=True)
-        for test in args.sql or [
-            "tests/qr-store-logo-database.sql",
+        # Catalog-only assertions compare exact pre-caption schemas. Verify them
+        # at their migration boundary, then snapshot and exercise the latest chain.
+        caption_test = ROOT / "tests/qr-store-name-database.sql"
+        if not args.baseline and not args.store_baseline:
+            print("Executing tests/qr-store-logo-database.sql (catalog migration boundary)", flush=True)
+            sql(STORE_TEST.read_text())
+            sql("\\set qr_store_name_before true\n" + caption_test.read_text())
+            if not args.caption_baseline:
+                for migration in sorted(MIGRATIONS.glob("*_qr_store_name.sql")):
+                    print("Applying " + migration.name, flush=True)
+                    sql(migration.read_text())
+        feature_tests = (["tests/qr-store-logo-database.sql"] if args.baseline or args.store_baseline
+                         else ["tests/qr-store-name-database.sql", "tests/qr-store-name-validation.sql"])
+        for test in args.sql or feature_tests + [
             "tests/qr-logo-database.sql", "tests/qr-logo-files-database.sql",
             "tests/qr-logo-regression-database.sql", "tests/qr-files.sql", "tests/qr-trash.sql",
             "tests/qr-analytics.sql", "tests/qr-unique.sql", "tests/qr-accounts.sql",
         ]:
+            if test == "tests/qr-store-logo-database.sql" and not args.baseline and not args.store_baseline:
+                continue  # Already verified before the additive caption DDL.
             path = (ROOT / test).resolve()
             if not path.is_relative_to(ROOT / "tests"):
                 raise ValueError("SQL tests must live within repository tests/")

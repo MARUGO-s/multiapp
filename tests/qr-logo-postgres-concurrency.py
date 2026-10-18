@@ -137,6 +137,39 @@ def check_concurrency(container: str, log_dir: Path, *, docker_command: list[str
         assert results[0] == results[1], "competing completion must return the same persisted identity"
         assert sql(f"select count(*) from kotonoha.qr_links where id='{item}'") == "1"
         print("PASS: competing first completions return the same persisted frozen-logo link", flush=True)
+        # New caption races retain the same parent/file lock ordering and replay
+        # semantics; old SNS-only sessions above remain unchanged regressions.
+        item = str(uuid.uuid4())
+        args = json.dumps({"title": "Caption race", "fileName": "menu.pdf", "mime": "application/pdf", "size": 100, "logoId": "store-marugo-d", "storeName": "Frozen caption"})
+        row(f"select public.kotonoha_qr_file('init','{own}','{item}','{args}')")
+        lock = holder(f"select id from kotonoha.qr_files where id='{item}' for update")
+        completions = []
+        for index in range(2):
+            code = uuid.uuid4().hex[:12]
+            payload = json.dumps({"code": code, "targetUrl": "https://example.com/file/" + code, "storeName": "forged"})
+            completions.append(launch(f"qr-caption-complete-{index}", f"select public.kotonoha_qr_file('complete','{own}','{item}','{payload}')"))
+        waiting(["qr-caption-complete-0", "qr-caption-complete-1"])
+        release(lock)
+        results = [finish(worker) for worker in completions]
+        assert isinstance(results[0], dict)
+        assert results[0] == results[1] and results[0]["store_name"] == "Frozen caption"
+        original = results[0]
+        print("PASS: competing STORE file completions return the same frozen-caption row", flush=True)
+
+        # Both a legacy same-logo PATCH and a completion replay wait behind a
+        # caption edit. After commit both must return the edited current row.
+        payload = json.dumps({"logoId": "store-marugo-d", "storeName": "Later caption"})
+        lock = holder(f"select public.kotonoha_qr('logo','{own}','{item}','{payload}')")
+        old = launch("qr-caption-old-client", f"select public.kotonoha_qr('logo','{own}','{item}',jsonb_build_object('logoId','store-marugo-d'))")
+        replay = launch("qr-caption-replay", f"select public.kotonoha_qr_file('complete','{own}','{item}','{{}}')")
+        waiting(["qr-caption-old-client", "qr-caption-replay"])
+        release(lock)
+        results = [finish(old), finish(replay)]
+        assert isinstance(results[0], dict)
+        assert results[0] == results[1] and results[0]["store_name"] == "Later caption"
+        assert {k:v for k,v in results[0].items() if k != "store_name"} == {k:v for k,v in original.items() if k != "store_name"}
+        assert sql(f"select initial_store_name from kotonoha.qr_files where id='{item}'") == "Frozen caption"
+        print("PASS: locked legacy PATCH and completion replay reread later caption without overwriting frozen metadata", flush=True)
     finally:
         for worker in workers:
             if worker.poll() is None:

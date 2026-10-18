@@ -3,6 +3,9 @@ import { FileUp, LoaderCircle } from "lucide-react";
 import { useQrApi, type QrLink } from "./qr-api";
 import { isFileDrag, selectedQrFile } from "./qr-file-selection.mjs";
 import { QrLogoPicker } from "./QrLogoPicker";
+import { QrStoreNameField } from "./QrStoreNameField";
+import { QR_LOGOS } from "../supabase/functions/_shared/qr-logos.mjs";
+import { validateStoreName } from "../supabase/functions/_shared/qr-store-name.mjs";
 import {
   fileSpecification,
   matchesFileSignature,
@@ -45,6 +48,8 @@ export function QrFileUpload({
   onBusy,
   busy,
   logoId = null,
+  storeName = null,
+  onStoreNameChange,
   onLogoChange,
   onPendingChange,
 }: {
@@ -52,6 +57,8 @@ export function QrFileUpload({
   onBusy: (busy: boolean) => void;
   busy: boolean;
   logoId?: string | null;
+  storeName?: string | null;
+  onStoreNameChange?: (value: string) => void;
   onLogoChange?: (logoId: string | null) => void;
   onPendingChange?: (pending: boolean) => void;
 }) {
@@ -70,6 +77,7 @@ export function QrFileUpload({
     file: File;
     title: string;
     logoId: string | null;
+    storeName: string | null;
   } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -119,7 +127,16 @@ export function QrFileUpload({
     setError("");
     onBusy(true);
     try {
-      const snapshot = attempt.current || { file, title: title.trim(), logoId };
+      const snapshot = attempt.current || {
+        file,
+        title: title.trim(),
+        logoId,
+        storeName: QR_LOGOS.some(
+          (logo) => logo.id === logoId && logo.kind === "store",
+        )
+          ? validateStoreName(storeName)
+          : null,
+      };
       const spec = fileSpecification(snapshot.file.name, snapshot.file.size);
       if (
         !matchesFileSignature(
@@ -150,6 +167,7 @@ export function QrFileUpload({
           id,
           title: attempt.current.title,
           logoId: attempt.current.logoId,
+          storeName: attempt.current.storeName,
           ...spec,
           publishConfirmed: true,
         }),
@@ -304,6 +322,16 @@ export function QrFileUpload({
         value={pending && attempt.current ? attempt.current.logoId : logoId}
         onChange={(value) => {
           if (!busy && !pending) onLogoChange?.(value);
+        }}
+        disabled={busy || pending}
+      />
+      <QrStoreNameField
+        logoId={pending && attempt.current ? attempt.current.logoId : logoId}
+        value={
+          pending && attempt.current ? attempt.current.storeName : storeName
+        }
+        onChange={(value) => {
+          if (!busy && !pending) onStoreNameChange?.(value);
         }}
         disabled={busy || pending}
       />

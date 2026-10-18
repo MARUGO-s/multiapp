@@ -34,6 +34,7 @@ export type QrLink = {
   last_accessed_at: string | null;
   deleted_at: string | null;
   logo_id?: string | null;
+  store_name?: string | null;
 };
 export type QrHistory = {
   events: {

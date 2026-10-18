@@ -473,8 +473,27 @@
   display: block;
   width: 100%;
   max-width: 250px;
-  aspect-ratio: 1;
+  height: auto;
   margin: 0 auto 18px;
+}
+.qr-store-name-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0;
+}
+.qr-create-card > .qr-store-name-field {
+  grid-column: 1 / -1;
+}
+.qr-store-name-field input {
+  width: 100%;
+  min-width: 0;
+}
+.qr-store-name-field p {
+  margin: 0;
+}
+.qr-store-name-field input[aria-invalid="true"] {
+  border-color: var(--danger, #b42318);
 }
 .qr-preview .button {
   justify-content: center;

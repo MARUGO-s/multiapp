@@ -28,7 +28,7 @@ const server = await createServer({
           return `
         import { buildTrackingUrl } from '/src/qr-routing.mjs';
         import { qrAnalyticsFixture } from '/tests/fixtures/qr-analytics.mjs';
-        const initial = [{id:'00000000-0000-4000-8000-000000000001',code:'AbCd1234EfGh',title:'店頭ポスター（検証用）',target_url:'https://example.invalid/menu',scan_count:37,active:true,created_at:'2026-10-01T01:00:00Z',last_accessed_at:'2026-10-17T01:00:00Z',deleted_at:null,logo_id:null}];
+        const initial = [{id:'00000000-0000-4000-8000-000000000001',code:'AbCd1234EfGh',title:'店頭ポスター（検証用）',target_url:'https://example.invalid/menu',scan_count:37,active:true,created_at:'2026-10-01T01:00:00Z',last_accessed_at:'2026-10-17T01:00:00Z',deleted_at:null,logo_id:null,store_name:null}];
         const control = window.__qrFixture = {calls:[], notifications:[], rows:structuredClone(initial), failure:null, holdNextList:false, pendingLists:[], nextNumber:2};
         const clone = value => structuredClone(value);
         export const trackingUrl = (code,source='unknown') => buildTrackingUrl('/multiapp/','https://marugo-s.github.io',code,source);
@@ -57,7 +57,9 @@ const server = await createServer({
             const id=path.split('/')[2];
             const row=control.rows.find(row=>row.id===id);
             if(!row) throw new Error('QRが見つかりません。');
+            if (control.failure === 'caption-mismatch') return {...clone(row), logo_id:body.logoId, store_name:'mismatched response'};
             row.logo_id=body.logoId;
+            row.store_name=body.storeName ?? null;
             if(control.failure==='unknown-once') { control.failure=null; throw new Error('通信結果を確認できませんでした。'); }
             return clone(row);
           }
@@ -65,7 +67,7 @@ const server = await createServer({
             let row=control.rows.find(row=>row.id===body.id);
             if(!row) {
               const n=control.nextNumber++;
-              row={...initial[0],id:body.id,code:n===2?'MnOp1234QrSt':'UvWx1234YzAb',title:body.title,target_url:body.targetUrl||'https://example.invalid/published-file',scan_count:0,last_accessed_at:null,logo_id:body.logoId||null};
+              row={...initial[0],id:body.id,code:n===2?'MnOp1234QrSt':'UvWx1234YzAb',title:body.title,target_url:body.targetUrl||'https://example.invalid/published-file',scan_count:0,last_accessed_at:null,logo_id:body.logoId||null,store_name:body.storeName ?? null};
               control.rows.unshift(row);
             }
             if(control.failure==='unknown-once') {control.failure=null; throw new Error('通信結果を確認できませんでした。');}
