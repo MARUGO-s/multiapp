@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { qrImageDataUrl } from "./qr-image.mjs";
+import { qrImageWithStoreNameDataUrl } from "./qr-caption.mjs";
 import {
   ArrowDownToLine,
   Copy,
@@ -23,6 +23,9 @@ import { isCloud } from "./cloud";
 import { QrAnalytics } from "./QrAnalytics";
 import { QrFileUpload } from "./QrFileUpload";
 import { QrLogoPicker } from "./QrLogoPicker";
+import { QrStoreNameField } from "./QrStoreNameField";
+import { QR_LOGOS } from "../supabase/functions/_shared/qr-logos.mjs";
+import { validateStoreName } from "../supabase/functions/_shared/qr-store-name.mjs";
 import { Modal } from "./Modal";
 import { lifecycleRequest } from "./qr-lifecycle.mjs";
 import {
@@ -54,6 +57,14 @@ export function QrPage({
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [creationLogoId, setCreationLogoId] = useState<string | null>(null);
+  const [creationStoreName, setCreationStoreName] = useState<string | null>(
+    null,
+  );
+  function chooseCreationLogo(logoId: string | null) {
+    if (busy || filePending || logoId === creationLogoId) return;
+    setCreationLogoId(logoId);
+    setCreationStoreName(null);
+  }
   const [filePending, setFilePending] = useState(false);
   const [links, setLinks] = useState<QrLink[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,6 +94,7 @@ export function QrPage({
   const [logoDraft, setLogoDraft] = useState<{
     id: string;
     logoId: string | null;
+    storeName: string | null;
   } | null>(null);
   const [logoError, setLogoError] = useState("");
   const [savingLogo, setSavingLogo] = useState(false);
@@ -90,12 +102,23 @@ export function QrPage({
     logoDraft?.id === selected?.id
       ? (logoDraft?.logoId ?? null)
       : (selected?.logo_id ?? null);
-  const logoChanged = !!selected && draftLogoId !== (selected.logo_id ?? null);
+  const draftStoreName =
+    logoDraft?.id === selected?.id
+      ? (logoDraft?.storeName ?? null)
+      : (selected?.store_name ?? null);
+  const logoChanged =
+    !!selected &&
+    (draftLogoId !== (selected.logo_id ?? null) ||
+      draftStoreName !== (selected.store_name ?? null));
   const [qrImage, setQrImage] = useState<{ key: string; url: string } | null>(
     null,
   );
   const qrKey = selected
-    ? JSON.stringify([selected.code, selected.logo_id ?? null])
+    ? JSON.stringify([
+        selected.code,
+        selected.logo_id ?? null,
+        selected.store_name ?? null,
+      ])
     : "";
   const qr = qrImage?.key === qrKey ? qrImage.url : "";
   const [qrError, setQrError] = useState("");
@@ -108,6 +131,7 @@ export function QrPage({
     title: string;
     targetUrl: string;
     logoId: string | null;
+    storeName: string | null;
   } | null>(null);
   const mounted = useRef(true);
   const currentPage = useRef(page);
@@ -187,10 +211,11 @@ export function QrPage({
     setQrImage(null);
     setQrError("");
     if (selected) {
-      qrImageDataUrl(
+      qrImageWithStoreNameDataUrl(
         trackingUrl(selected.code, "qr"),
         selected.logo_id ?? null,
         import.meta.env.BASE_URL,
+        selected.store_name ?? null,
       )
         .then((value) => {
           if (alive) setQrImage({ key: qrKey, url: value });
@@ -204,7 +229,7 @@ export function QrPage({
     return () => {
       alive = false;
     };
-  }, [selected?.code, selected?.logo_id]);
+  }, [selected?.code, selected?.logo_id, selected?.store_name]);
   useEffect(() => {
     let alive = true;
     setHistory(null);
@@ -233,16 +258,31 @@ export function QrPage({
   async function create(e: FormEvent) {
     e.preventDefault();
     if (busy || filePending) return;
+    let storeName: string | null;
+    try {
+      storeName = QR_LOGOS.some(
+        (logo) => logo.id === creationLogoId && logo.kind === "store",
+      )
+        ? validateStoreName(creationStoreName)
+        : null;
+    } catch {
+      setError(
+        "店舗名は80文字以内で入力してください。改行・制御文字は使えません。",
+      );
+      return;
+    }
     const fields = {
       title: title.trim(),
       targetUrl: url.trim(),
       logoId: creationLogoId,
+      storeName,
     };
     if (
       !createRequest.current ||
       createRequest.current.title !== fields.title ||
       createRequest.current.targetUrl !== fields.targetUrl ||
-      createRequest.current.logoId !== fields.logoId
+      createRequest.current.logoId !== fields.logoId ||
+      createRequest.current.storeName !== fields.storeName
     ) {
       createRequest.current = { id: crypto.randomUUID(), ...fields };
     }
@@ -260,6 +300,7 @@ export function QrPage({
       setTitle("");
       setUrl("");
       setCreationLogoId(null);
+      setCreationStoreName(null);
       setSelected(link);
       setHistoryPage(0);
       setPage(0);
@@ -288,22 +329,36 @@ export function QrPage({
     if (busy || !selected || !logoChanged) return;
     const link = selected;
     const logoId = draftLogoId;
+    let storeName: string | null;
+    try {
+      storeName = QR_LOGOS.some(
+        (logo) => logo.id === logoId && logo.kind === "store",
+      )
+        ? validateStoreName(draftStoreName)
+        : null;
+    } catch {
+      setLogoError(
+        "店舗名は80文字以内で入力してください。改行・制御文字は使えません。",
+      );
+      return;
+    }
     setBusy(true);
     setSavingLogo(true);
     setLogoError("");
     try {
       const updated = await qrApi<QrLink>(`/links/${link.id}/logo`, {
         method: "PATCH",
-        body: JSON.stringify({ logoId }),
+        body: JSON.stringify({ logoId, storeName }),
       });
       if (!mounted.current) return;
       if (
         updated.id !== link.id ||
         updated.code !== link.code ||
-        updated.logo_id !== logoId
+        updated.logo_id !== logoId ||
+        validateStoreName(updated.store_name) !== storeName
       ) {
         throw new Error(
-          "ロゴの保存結果を確認できませんでした。一覧を更新して確認し、必要に応じて再試行してください。",
+          "ロゴ・店舗名の保存結果を確認できませんでした。一覧を更新して確認し、必要に応じて再試行してください。",
         );
       }
       // Any list started before this write may still contain the old logo.
@@ -315,7 +370,7 @@ export function QrPage({
         previous?.id === link.id ? updated : previous,
       );
       if (selectedId.current === link.id) setLogoDraft(null);
-      notify("QRのロゴを保存しました。");
+      notify("QRのロゴ・店舗名を保存しました。");
     } catch (e) {
       if (mounted.current && selectedId.current === link.id)
         setLogoError(errorText(e));
@@ -525,12 +580,15 @@ export function QrPage({
                   onBusy={setBusy}
                   onPendingChange={setFilePending}
                   logoId={creationLogoId}
-                  onLogoChange={setCreationLogoId}
+                  storeName={creationStoreName}
+                  onStoreNameChange={setCreationStoreName}
+                  onLogoChange={chooseCreationLogo}
                   onCreated={(link) => {
                     if (!mounted.current) return;
                     ++listRequest.current;
                     createdSelection.current = link.id;
                     setCreationLogoId(null);
+                    setCreationStoreName(null);
                     setSelected(link);
                     setHistoryPage(0);
                     setPage(0);
@@ -582,7 +640,13 @@ export function QrPage({
                   </button>
                   <QrLogoPicker
                     value={creationLogoId}
-                    onChange={setCreationLogoId}
+                    onChange={chooseCreationLogo}
+                    disabled={busy || filePending}
+                  />
+                  <QrStoreNameField
+                    logoId={creationLogoId}
+                    value={creationStoreName}
+                    onChange={setCreationStoreName}
                     disabled={busy || filePending}
                   />
                   <p>
@@ -653,8 +717,27 @@ export function QrPage({
                     value={draftLogoId}
                     disabled={busy}
                     onChange={(logoId) => {
+                      if (busy || logoId === draftLogoId) return;
+                      setLogoDraft({
+                        id: selected.id,
+                        logoId,
+                        storeName: null,
+                      });
+                      setLogoError("");
+                    }}
+                  />
+                  <QrStoreNameField
+                    label="登録済みQRの店舗名"
+                    logoId={draftLogoId}
+                    value={draftStoreName}
+                    disabled={busy}
+                    onChange={(storeName) => {
                       if (busy) return;
-                      setLogoDraft({ id: selected.id, logoId });
+                      setLogoDraft({
+                        id: selected.id,
+                        logoId: draftLogoId,
+                        storeName,
+                      });
                       setLogoError("");
                     }}
                   />

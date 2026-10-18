@@ -1,3 +1,4 @@
+import { storeNamePayload } from "../_shared/qr-store-name.mjs";
 import { AccountError, qrScope } from "../_shared/qr-account-auth.ts";
 import { validVisitorId, visitorHash } from "../_shared/qr-visitor.mjs";
 import {
@@ -124,7 +125,9 @@ async function rpc(name: string, args: unknown) {
   });
   const data = await response.json();
   if (!response.ok) {
-    if (data.message === "INVALID_LOGO") throw new Error("INVALID_LOGO");
+    if (
+      data.message === "INVALID_LOGO" || data.message === "INVALID_STORE_NAME"
+    ) throw new Error(data.message);
     if (data.message === "NOT_FOUND") {
       throw new ApiError(404, "このQRコードは見つかりません。");
     }
@@ -329,6 +332,7 @@ export async function handler(req: Request): Promise<Response> {
             title: input.title.trim(),
             targetUrl: normalizeTarget(input.targetUrl),
             logoId: validateLogoId(input.logoId),
+            ...storeNamePayload(input),
           },
         }),
         201,
@@ -348,7 +352,10 @@ export async function handler(req: Request): Promise<Response> {
             ...args,
             p_operation: "logo",
             p_id: match[1],
-            p_payload: { logoId: validateLogoId(input.logoId) },
+            p_payload: {
+              logoId: validateLogoId(input.logoId),
+              ...storeNamePayload(input),
+            },
           }),
         );
       }
@@ -426,6 +433,12 @@ export async function handler(req: Request): Promise<Response> {
     }
     return json({ error: "ページが見つかりません。" }, 404);
   } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_STORE_NAME") {
+      return json(
+        { error: "店舗名は80文字以内の1行で入力してください。" },
+        400,
+      );
+    }
     if (error instanceof Error && error.message === "INVALID_LOGO") {
       return json({ error: "ロゴの指定が正しくありません。" }, 400);
     }

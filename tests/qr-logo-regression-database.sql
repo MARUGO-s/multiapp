@@ -9,10 +9,10 @@ begin
   -- No existing pre-migration link, file attempt, or unrelated QR RPC is rewritten.
   assert not exists(select 1 from kotonoha.qr_links l
     join public.qr_logo_legacy_snapshot s on l.id=(s.row->>'id')::uuid
-    where to_jsonb(l)-'logo_id' is distinct from s.row);
+    where to_jsonb(l)-array['logo_id','store_name'] is distinct from s.row);
   assert not exists(select 1 from kotonoha.qr_files f
     join public.qr_logo_legacy_file_snapshot s on f.id=(s.row->>'id')::uuid
-    where to_jsonb(f)-'logo_id' is distinct from s.row);
+    where to_jsonb(f)-array['logo_id','initial_store_name'] is distinct from s.row);
   assert (select logo_id is null from kotonoha.qr_links where id='00000000-0000-4000-8000-000000000073');
   assert (select logo_id is null from kotonoha.qr_files where id='00000000-0000-4000-8000-000000000074');
   assert not exists(select 1 from public.qr_logo_function_snapshot s

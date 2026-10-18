@@ -7,6 +7,8 @@ import ts from "typescript";
 import * as jsx from "react/jsx-runtime";
 import * as validation from "../supabase/functions/_shared/qr-files.mjs";
 import * as selection from "../src/qr-file-selection.mjs";
+import * as logos from "../supabase/functions/_shared/qr-logos.mjs";
+import * as storeNames from "../supabase/functions/_shared/qr-store-name.mjs";
 
 function harness() {
   const slots = [];
@@ -67,6 +69,10 @@ function harness() {
       if (name.endsWith("qr-files.mjs")) return validation;
       if (name.endsWith("qr-file-selection.mjs")) return selection;
       if (name === "./QrLogoPicker") return { QrLogoPicker: () => null };
+      if (name === "./QrStoreNameField")
+        return { QrStoreNameField: () => null };
+      if (name.endsWith("qr-logos.mjs")) return logos;
+      if (name.endsWith("qr-store-name.mjs")) return storeNames;
       if (name === "./qr-api")
         return {
           useQrApi: () => async (path, options) => {
