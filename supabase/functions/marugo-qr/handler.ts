@@ -338,9 +338,9 @@ export async function handler(req: Request): Promise<Response> {
           p_owner: session.workspaceId,
         });
         const mimeByCode = new Map(
-          (Array.isArray(kinds) ? kinds : []).map((item) => [item.code, item.mime]),
+          (Array.isArray(kinds) ? kinds : []).map((item: { code: string; mime: string }) => [item.code, item.mime]),
         );
-        listed.links = listed.links.map((link) => ({
+        listed.links = listed.links.map((link: { code: string }) => ({
           ...link,
           file_mime: mimeByCode.get(link.code) ?? null,
         }));
