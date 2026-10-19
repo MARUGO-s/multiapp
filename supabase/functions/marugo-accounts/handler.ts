@@ -8,6 +8,8 @@ import {
 } from "../_shared/qr-account-auth.ts";
 const origins = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://localhost:5188",
   "http://127.0.0.1:5188",
 ]);

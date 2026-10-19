@@ -2,12 +2,18 @@
 
 ## 対象
 
-- GitHub: `MARUGO-s/multiapp`、Pages `/multiapp/`、`main` のGitHub Actionsでフロントを公開。
+- GitHub: `MARUGO-s/multiapp`、Pages `https://marugo-waltz.com/`、`main` のGitHub Actionsでフロントを公開。
 - Supabase: `Recipe-Management` / `hjhkccbktkscwtgzxjfq`。他アプリと共用。
 - 追加領域: `kotonoha.meetings`、`kotonoha.settings`、`kotonoha.access_config`、`kotonoha.sessions`、`kotonoha.login_attempts`、service_role限定RPC `public.kotonoha_store` / `public.kotonoha_auth`、非公開バケット `kotonoha-audio`、Edge Function `kotonoha-api`。
-- Authユーザー・設定・既存のOpenAIキーは変更しない。フロントにあるのは公開用publishable keyのみ。
+- Authユーザー・既存のOpenAIキーは変更しない。独自ドメイン対応ではAuthのredirect許可リストだけを追加し、Site URLと他設定を保持する。フロントにあるのは公開用publishable keyのみ。
 
 ## 更新
+
+### 独自ドメイン運用（2026-10-20）
+
+公開先は `https://marugo-waltz.com/`。`actions/configure-pages`をbuildより前に実行し、`base_path`へ末尾 `/` を付けた値を`VITE_BASE_PATH`として渡す。Viteのproduction既定は `/`、従来project URLでの再配布は`VITE_BASE_PATH=/multiapp/`を明示する。旧prefixのまま独自ドメインrootへ配布するとmoduleが404になり白画面になる。HTTPS強制を有効にし、kotonoha-api/marugo-accounts/marugo-qrでHTTPSのapex/wwwを完全一致許可する。Supabase Authの既存Site URL・他アプリcallbackを保持し、両hostの`/?account=google|confirm|recovery`6件を正確に追加する。Google側callbackはSupabase既存URLのまま。DB migrationや業務行変更は不要。directory管理APIはこのQR修正の対象外。
+
+回帰は`node --test tests/pages-base.test.mjs`、cross-handlerの`cloud-custom-domain.test.ts`は **kotonoha-api/deno.json** で実行する。`scripts/check-domain-browser.mjs`は既定でdistを一時HTTP公開しPC/phoneのlogin・入力保持・trackingロードを確認し、APIは全て代替応答にする。公開確認は`DOMAIN_SMOKE_URL=https://marugo-waltz.com/`を指定する。本物のログイン/保存成功を意味しない。ロールバックは既存保存データ/URLを維持し、独自ドメインが有効な限りroot配信を保つ。単純な旧asset復元は白画面を再発させる。
 
 ### 2026-10-18 JST 店舗名の共有保存・PNG下部表示（本番反映済み）
 
