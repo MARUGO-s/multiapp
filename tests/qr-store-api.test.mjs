@@ -71,6 +71,8 @@ test("QR API binds all CRUD, analytics, trash and file requests to store and ide
       if (name === "../supabase/functions/_shared/qr-logos.mjs")
         return qrLogoCatalog;
       if (name === "./qr-routing.mjs") return { buildTrackingUrl: () => "" };
+      if (name === "../supabase/functions/_shared/qr-card.mjs")
+        return { htmlCardPageUrl: () => "" };
       throw new Error(name);
     },
     fetch: async (url, options) => {

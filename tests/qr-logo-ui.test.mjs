@@ -186,6 +186,10 @@ function harness(component = "QrPage", options = {}) {
           useQrApi: () => api,
           trackingUrl: (code, source) =>
             `https://local.test/multiapp/?s=${source === "qr" ? "q" : "b"}#${code}`,
+          copiedShareUrl: (code, source, fileMime) =>
+            fileMime === "text/html"
+              ? `https://local.test/s/${code}.html?s=${source === "qr" ? "q" : "b"}`
+              : `https://local.test/multiapp/?s=${source === "qr" ? "q" : "b"}#${code}`,
         };
       if (name.endsWith("qr-store-name.mjs")) return storeNames;
       if (name === "./QrStoreNameField")
