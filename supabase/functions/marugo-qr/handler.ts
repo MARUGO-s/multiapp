@@ -18,6 +18,10 @@ import {
   accessDevice,
   QR_SOURCES,
 } from "../_shared/qr-attribution.mjs";
+import {
+  cardDestination,
+  cardHtml,
+} from "../_shared/qr-card.mjs";
 
 const origins = new Set([
   "https://marugo-s.github.io",
@@ -210,7 +214,7 @@ export async function handler(req: Request): Promise<Response> {
     }
     return new Response(JSON.stringify(data), { status, headers });
   };
-  if (origin && !origins.has(origin)) {
+  if (origin && !origins.has(origin) && !new URL(req.url).pathname.includes("/card/")) {
     return json({ error: "アクセス元が許可されていません。" }, 403);
   }
   if (req.method === "OPTIONS") {
@@ -222,6 +226,28 @@ export async function handler(req: Request): Promise<Response> {
     const index = url.pathname.indexOf(prefix);
     if (index < 0) return json({ error: "ページが見つかりません。" }, 404);
     const route = url.pathname.slice(index + prefix.length);
+    const cardRoute = route.match(/^\/card\/([A-Za-z0-9_-]{12})$/);
+    if (cardRoute && req.method === "GET") {
+      const marker = url.searchParams.get("s");
+      const source = marker === "q" || marker === "b" || marker === "l" ? marker : "l";
+      let name = "公開リンク";
+      try {
+        const card = await rpc("kotonoha_qr_card", { p_code: cardRoute[1] });
+        if (card && typeof card.name === "string" && card.name.trim()) name = card.name;
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      }
+      const destination = cardDestination(cardRoute[1], source);
+      return new Response(cardHtml(name, destination), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer",
+        },
+      });
+    }
     const fileRoute = route.match(/^\/files\/([A-Za-z0-9_-]{12})$/);
     if (fileRoute && req.method === "GET")
       return json(await publicFile(fileRoute[1], rpc));
