@@ -49,3 +49,9 @@ export function matchesFileSignature(mime, bytes) {
   if (mime === "text/html") return isHtmlDocument(bytes);
   return false;
 }
+export function responseMimeMatches(expected, header) {
+  const mime = header?.split(";")[0]?.trim().toLowerCase();
+  if (mime === expected) return true;
+  // Storage serves HTML as text/plain so the storage host does not execute it.
+  return expected === "text/html" && mime === "text/plain";
+}

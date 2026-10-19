@@ -60,3 +60,10 @@ test("QR file contents must match the extension; scripts and PSD are rejected", 
       false,
     );
 });
+test("storage may serve HTML as text/plain without accepting that type for other files", async () => {
+  const { responseMimeMatches } = await import("../supabase/functions/_shared/qr-files.mjs");
+  assert.equal(responseMimeMatches("text/html", "text/plain"), true);
+  assert.equal(responseMimeMatches("text/html", "text/html; charset=utf-8"), true);
+  assert.equal(responseMimeMatches("application/pdf", "text/plain"), false);
+  assert.equal(responseMimeMatches("text/html", "application/octet-stream"), false);
+});
