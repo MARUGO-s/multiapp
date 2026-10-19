@@ -18,7 +18,7 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useQrApi, type QrHistory, type QrLink, trackingUrl } from "./qr-api";
+import { copiedShareUrl, useQrApi, type QrHistory, type QrLink, trackingUrl } from "./qr-api";
 import { isCloud } from "./cloud";
 import { QrAnalytics } from "./QrAnalytics";
 import { QrFileUpload } from "./QrFileUpload";
@@ -317,7 +317,9 @@ export function QrPage({
     source: "qr" | "button" | "link" = "button",
   ) {
     try {
-      await navigator.clipboard.writeText(trackingUrl(link.code, source));
+      await navigator.clipboard.writeText(
+        copiedShareUrl(link.code, source, link.file_mime),
+      );
       notify("計測用URLをコピーしました。");
     } catch {
       notify(
@@ -765,7 +767,7 @@ export function QrPage({
                   <div className="qr-copy-row">
                     <input
                       readOnly
-                      value={trackingUrl(selected.code, "button")}
+                      value={copiedShareUrl(selected.code, "button", selected.file_mime)}
                       onFocus={(e) => e.target.select()}
                     />
                     <button
@@ -783,7 +785,7 @@ export function QrPage({
                   <div className="qr-copy-row">
                     <input
                       readOnly
-                      value={trackingUrl(selected.code, "qr")}
+                      value={copiedShareUrl(selected.code, "qr", selected.file_mime)}
                       onFocus={(e) => e.target.select()}
                     />
                     <button
@@ -810,7 +812,7 @@ export function QrPage({
                       try {
                         await navigator.clipboard.writeText(
                           buttonHtml(
-                            trackingUrl(selected.code, "button"),
+                            copiedShareUrl(selected.code, "button", selected.file_mime),
                             selected.title,
                           ),
                         );

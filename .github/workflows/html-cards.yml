@@ -1,0 +1,26 @@
+name: Refresh HTML LINE cards
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: cards
+        run: |
+          curl -fsS "https://hjhkccbktkscwtgzxjfq.supabase.co/functions/v1/marugo-qr/html-cards" -o cards.json
+          echo "sha=$(sha256sum cards.json | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: seen
+        with:
+          path: cards.json
+          key: html-cards-${{ steps.cards.outputs.sha }}
+      - if: steps.seen.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run "Deploy kotonoha to GitHub Pages" --ref main

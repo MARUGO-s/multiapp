@@ -1,5 +1,6 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./cloud";
 import { buildTrackingUrl } from "./qr-routing.mjs";
+import { htmlCardPageUrl } from "../supabase/functions/_shared/qr-card.mjs";
 import { createContext, useContext, useMemo } from "react";
 import { qrCredentials } from "./qr-account-client";
 import { scopedQrPath } from "./qr-account-routing.mjs";
@@ -35,6 +36,7 @@ export type QrLink = {
   deleted_at: string | null;
   logo_id?: string | null;
   store_name?: string | null;
+  file_mime?: string | null;
 };
 export type QrHistory = {
   events: {
@@ -84,6 +86,14 @@ export function trackingUrl(
     code,
     source,
   );
+}
+export function copiedShareUrl(
+  code: string,
+  source: "qr" | "button" | "link" | "unknown" = "button",
+  fileMime?: string | null,
+) {
+  if (fileMime === "text/html") return htmlCardPageUrl(location.origin, code, source);
+  return trackingUrl(code, source);
 }
 export async function qrApi<T>(
   path: string,

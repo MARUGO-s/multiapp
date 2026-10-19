@@ -19,7 +19,6 @@ import {
   QR_SOURCES,
 } from "../_shared/qr-attribution.mjs";
 import {
-  cardDestination,
   cardHtml,
 } from "../_shared/qr-card.mjs";
 
@@ -228,8 +227,6 @@ export async function handler(req: Request): Promise<Response> {
     const route = url.pathname.slice(index + prefix.length);
     const cardRoute = route.match(/^\/card\/([A-Za-z0-9_-]{12})$/);
     if (cardRoute && req.method === "GET") {
-      const marker = url.searchParams.get("s");
-      const source = marker === "q" || marker === "b" || marker === "l" ? marker : "l";
       let name = "公開リンク";
       try {
         const card = await rpc("kotonoha_qr_card", { p_code: cardRoute[1] });
@@ -237,8 +234,7 @@ export async function handler(req: Request): Promise<Response> {
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 404) throw error;
       }
-      const destination = cardDestination(cardRoute[1], source);
-      return new Response(cardHtml(name, destination), {
+      return new Response(cardHtml(name, cardRoute[1]), {
         status: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
@@ -247,6 +243,9 @@ export async function handler(req: Request): Promise<Response> {
           "Referrer-Policy": "no-referrer",
         },
       });
+    }
+    if (route === "/html-cards" && req.method === "GET") {
+      return json(await rpc("kotonoha_qr_html_cards", {}));
     }
     const fileRoute = route.match(/^\/files\/([A-Za-z0-9_-]{12})$/);
     if (fileRoute && req.method === "GET")
@@ -329,13 +328,24 @@ export async function handler(req: Request): Promise<Response> {
       if (view !== "active" && view !== "trash") {
         throw new ApiError(400, "一覧の指定が正しくありません。");
       }
-      return json(
-        await rpc("kotonoha_qr", {
-          ...args,
-          p_operation: view === "trash" ? "trash_list" : "list",
-          p_payload: { page },
-        }),
-      );
+      const listed = await rpc("kotonoha_qr", {
+        ...args,
+        p_operation: view === "trash" ? "trash_list" : "list",
+        p_payload: { page },
+      });
+      if (view === "active" && listed && Array.isArray(listed.links)) {
+        const kinds = await rpc("kotonoha_qr_file_kinds", {
+          p_owner: session.workspaceId,
+        });
+        const mimeByCode = new Map(
+          (Array.isArray(kinds) ? kinds : []).map((item) => [item.code, item.mime]),
+        );
+        listed.links = listed.links.map((link) => ({
+          ...link,
+          file_mime: mimeByCode.get(link.code) ?? null,
+        }));
+      }
+      return json(listed);
     }
     if (route === "/links" && req.method === "POST") {
       const input = await body(req);
