@@ -333,7 +333,12 @@ export async function handler(req: Request): Promise<Response> {
         p_operation: view === "trash" ? "trash_list" : "list",
         p_payload: { page },
       });
-      if (view === "active" && listed && Array.isArray(listed.links)) {
+      if (
+        view === "active" &&
+        url.searchParams.get("kinds") === "1" &&
+        listed &&
+        Array.isArray(listed.links)
+      ) {
         const kinds = await rpc("kotonoha_qr_file_kinds", {
           p_owner: session.workspaceId,
         });
