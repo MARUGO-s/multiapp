@@ -163,7 +163,7 @@ export function QrPage({
       listRequest.current === requestId;
     try {
       const data = await qrApi<{ links: QrLink[]; total: number }>(
-        `/links?page=${page}&view=${view}`,
+        `/links?page=${page}&view=${view}&kinds=1`,
       );
       if (!current()) return;
       if (page > 0 && page * 50 >= data.total) {
