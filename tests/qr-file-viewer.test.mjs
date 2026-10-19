@@ -102,6 +102,17 @@ for (const mime of ["application/pdf", "image/png", "image/jpeg"]) {
     }
   });
 }
+test("Public HTML renders in a unique-origin sandbox and not as an image", async () => {
+  const { tree, Preview } = await publicViewer("text/html");
+  const all = nodes(tree);
+  const frame = all.find((n) => n.type === "iframe");
+  assert.equal(frame.props.src, "https://test.invalid/view");
+  assert.equal(frame.props.referrerPolicy, "no-referrer");
+  assert.match(frame.props.sandbox, /\ballow-scripts\b/);
+  assert.doesNotMatch(frame.props.sandbox, /allow-same-origin|allow-top-navigation/);
+  assert.equal(all.some((n) => n.type === "img" || n.type === Preview), false);
+  assert.doesNotMatch(JSON.stringify(tree), /private-original|internal-name|download/);
+});
 test("Unavailable public file retains error and retry without exposing metadata", async () => {
   const { tree } = await publicViewer("application/pdf", true);
   const all = nodes(tree);

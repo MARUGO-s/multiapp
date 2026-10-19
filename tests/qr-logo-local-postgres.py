@@ -127,11 +127,17 @@ def main() -> None:
                 for migration in sorted(MIGRATIONS.glob("*_qr_store_name.sql")):
                     print("Applying " + migration.name, flush=True)
                     sql(migration.read_text())
+                for migration in sorted(MIGRATIONS.glob("*_qr_html_file.sql")):
+                    print("Applying " + migration.name, flush=True)
+                    sql(migration.read_text())
+        html_ready = not args.baseline and not args.store_baseline and not args.caption_baseline
         feature_tests = (["tests/qr-store-logo-database.sql"] if args.baseline or args.store_baseline
                          else ["tests/qr-store-name-database.sql", "tests/qr-store-name-validation.sql"])
         for test in args.sql or feature_tests + [
             "tests/qr-logo-database.sql", "tests/qr-logo-files-database.sql",
-            "tests/qr-logo-regression-database.sql", "tests/qr-files.sql", "tests/qr-trash.sql",
+            "tests/qr-logo-regression-database.sql", "tests/qr-files.sql",
+            *(["tests/qr-html-file.sql"] if html_ready else []),
+            "tests/qr-trash.sql",
             "tests/qr-analytics.sql", "tests/qr-unique.sql", "tests/qr-accounts.sql",
         ]:
             if test == "tests/qr-store-logo-database.sql" and not args.baseline and not args.store_baseline:

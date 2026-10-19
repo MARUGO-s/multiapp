@@ -66,6 +66,13 @@ function PublicQrFile() {
       {file && (
         file.mime === "application/pdf" ? (
           <PdfPreview key={file.url} url={file.url} />
+        ) : file.mime === "text/html" ? (
+          <iframe
+            title="公開HTML"
+            src={file.url}
+            sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+            referrerPolicy="no-referrer"
+          />
         ) : (
           <img src={file.url} alt="公開画像" referrerPolicy="no-referrer" />
         )

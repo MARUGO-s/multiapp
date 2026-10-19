@@ -170,7 +170,7 @@ test("Multiple or invalid dropped files cannot publish; busy/retry cannot replac
     /1つずつ/,
   );
   assert.equal(h.calls.length, 0);
-  h.dropZone().props.onDrop(h.event([new File(["hello"], "bad.html")]));
+  h.dropZone().props.onDrop(h.event([new File(["<svg></svg>"], "bad.svg")]));
   assert.match(
     h.find((n) => n.props?.role === "alert").props.children[0],
     /PDF/,
