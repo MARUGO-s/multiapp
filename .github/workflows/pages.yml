@@ -27,6 +27,9 @@ jobs:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
           VITE_QR_GOOGLE_AUTH_ENABLED: ${{ vars.QR_GOOGLE_AUTH_ENABLED }}
           VITE_PORTAL_GOOGLE_AUTH_ENABLED: ${{ vars.PORTAL_GOOGLE_AUTH_ENABLED }}
+      - run: node scripts/write-html-cards.mjs dist
+        env:
+          QR_HTML_CARDS_URL: https://hjhkccbktkscwtgzxjfq.supabase.co/functions/v1/marugo-qr/html-cards
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x

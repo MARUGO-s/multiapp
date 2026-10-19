@@ -18,20 +18,21 @@ export function cardDestination(code, source = "b") {
   return `${PUBLIC_ORIGIN}/?s=${marker}#${code}`;
 }
 
-export function shareCardUrl(supabaseUrl, code, source = "button") {
+export function htmlCardPageUrl(origin, code, source = "button") {
   if (!CODE.test(code)) throw new Error("Invalid QR code");
   const marker = { qr: "q", button: "b", link: "l" }[source] || "l";
   const url = new URL(
-    `/functions/v1/marugo-qr/card/${code}`,
-    supabaseUrl,
+    `s/${code}.html`,
+    origin.endsWith("/") ? origin : `${origin}/`,
   );
   url.searchParams.set("s", marker);
   return url.href;
 }
 
-export function cardHtml(name, destination) {
+export function cardHtml(name, code) {
+  if (!CODE.test(code)) throw new Error("Invalid QR code");
   const text = escapeCardText(name || "公開リンク");
-  const href = escapeCardText(destination);
+  const href = escapeCardText(cardDestination(code, "l"));
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -45,7 +46,11 @@ export function cardHtml(name, destination) {
 <body>
 <p>${text}</p>
 <p><a href="${href}">開く</a></p>
-<script>location.replace(${JSON.stringify(destination)})</script>
+<script>
+const marker = new URLSearchParams(location.search).get("s");
+const source = marker === "q" || marker === "b" || marker === "l" ? marker : "l";
+location.replace(${JSON.stringify(PUBLIC_ORIGIN)} + "/?s=" + source + "#${code}");
+</script>
 </body>
 </html>
 `;
