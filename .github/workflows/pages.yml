@@ -20,8 +20,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - id: pages
+        uses: actions/configure-pages@v5
       - run: npm run check
         env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
           VITE_QR_GOOGLE_AUTH_ENABLED: ${{ vars.QR_GOOGLE_AUTH_ENABLED }}
           VITE_PORTAL_GOOGLE_AUTH_ENABLED: ${{ vars.PORTAL_GOOGLE_AUTH_ENABLED }}
       - uses: denoland/setup-deno@v2
@@ -34,11 +37,11 @@ jobs:
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-google-auth.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-tick.test.ts
       - run: deno check --config supabase/functions/marugo-qr/deno.json supabase/functions/marugo-qr/index.ts
-      - run: deno test --allow-env --config supabase/functions/marugo-qr/deno.json tests/cloud-qr.test.ts tests/cloud-qr-files.test.ts tests/cloud-qr-logos.test.ts tests/cloud-qr-store-logos.test.ts tests/cloud-qr-catalog-compat.test.ts tests/cloud-qr-store-name.test.ts
+      - run: deno test --allow-env --config supabase/functions/marugo-qr/deno.json tests/cloud-qr.test.ts tests/cloud-qr-files.test.ts tests/cloud-qr-logos.test.ts tests/cloud-qr-store-logos.test.ts tests/cloud-qr-catalog-compat.test.ts tests/cloud-qr-store-name.test.ts tests/cloud-domain-target.test.ts
+      - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-custom-domain.test.ts
       - run: deno check --config supabase/functions/marugo-accounts/deno.json supabase/functions/marugo-accounts/index.ts
       - run: deno test --allow-env --config supabase/functions/marugo-accounts/deno.json tests/cloud-accounts.test.ts tests/cloud-shared-qr.test.ts
       - run: deno test --allow-env --config supabase/functions/kotonoha-api/deno.json tests/cloud-bot.test.ts
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

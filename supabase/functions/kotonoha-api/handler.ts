@@ -94,6 +94,8 @@ const BUCKET = "kotonoha-audio";
 const DOCUMENT_BUCKET = "kotonoha-documents";
 const ORIGINS = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://127.0.0.1:5188",
   "http://localhost:5188",
   "http://127.0.0.1:5189",

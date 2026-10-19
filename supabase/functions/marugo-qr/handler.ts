@@ -21,6 +21,8 @@ import {
 
 const origins = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://127.0.0.1:5188",
   "http://localhost:5188",
 ]);
@@ -64,12 +66,15 @@ export function normalizeTarget(value: unknown): string {
     );
   }
   if (
-    url.hostname === "marugo-s.github.io" &&
-    (["/multiapp/marugo", "/OEM/marugo"].includes(
-      url.pathname.replace(/\/$/, ""),
-    ) ||
-      (["/multiapp", "/OEM"].includes(url.pathname.replace(/\/$/, "")) &&
-        url.hash.length > 1))
+    (url.hostname === "marugo-s.github.io" &&
+      (["/multiapp/marugo", "/OEM/marugo"].includes(
+        url.pathname.replace(/\/$/, ""),
+      ) ||
+        (["/multiapp", "/OEM"].includes(url.pathname.replace(/\/$/, "")) &&
+          url.hash.length > 1))) ||
+    (["marugo-waltz.com", "www.marugo-waltz.com"].includes(url.hostname) &&
+      (url.pathname.replace(/\/$/, "") === "/marugo" ||
+        (url.pathname === "/" && url.hash.length > 1)))
   ) {
     throw new ApiError(
       400,

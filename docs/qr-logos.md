@@ -1,8 +1,10 @@
 # MARUGO QR — 中央ロゴの選択・共有保存
 
-更新日: 2026-10-18（JST）
+更新日: 2026-10-20（JST）
 
 ## 状態
+
+2026-10-20の独自ドメイン対応：公開先は `https://marugo-waltz.com/`。GitHub Pagesの実際のbase_pathをビルドへ渡し、独自ドメインでは `/`、project siteでは指定prefixを使う。旧 `/multiapp/assets/` の404が白画面の原因だった。共有ログイン・アカウント・QRの3 APIはHTTPSのapex/wwwだけを追加許可し、認証・店舗権限・既存originは維持する。自己参照転送の拒否も新ドメインへ拡張する。既存QR・URL・履歴・DBを変更しない。旧GitHubファイルURLのqueryを保った独自ドメインへの転送、HTTPS強制、既存Auth Site URLを保った6つの正確なcallback追加を確認。バックエンドはkotonoha-api v52 / marugo-accounts v5 / marugo-qr v16、配布後34ソース一致・他23関数不変・実HTTP18条件成功。実利用者のログインと業務保存は未試験。以下の10/18公開記録は当時の履歴である。
 
 ### 店舗名の下部表示・編集：本番反映・公開確認済み（2026-10-18 JST）
 
