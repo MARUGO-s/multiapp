@@ -2,6 +2,7 @@ import {
   fileSpecification,
   matchesFileSignature,
   QR_FILE_TYPE_LABEL,
+  responseMimeMatches,
 } from "../_shared/qr-files.mjs";
 import { storeNamePayload } from "../_shared/qr-store-name.mjs";
 import { validateLogoId } from "../_shared/qr-logos.mjs";
@@ -73,7 +74,6 @@ async function verified(file: any) {
   const total =
     response.headers.get("content-range")?.split("/").at(-1) ??
     response.headers.get("content-length");
-  const mime = response.headers.get("content-type")?.split(";")[0];
   const reader = response.body.getReader();
   const prefix = new Uint8Array(32);
   let offset = 0;
@@ -90,7 +90,7 @@ async function verified(file: any) {
   }
   if (
     Number(total) !== Number(file.size) ||
-    mime !== file.mime ||
+    !responseMimeMatches(file.mime, response.headers.get("content-type")) ||
     !matchesFileSignature(file.mime, prefix.subarray(0, offset))
   )
     throw new FileError(
