@@ -1,6 +1,7 @@
 import {
   fileSpecification,
   matchesFileSignature,
+  QR_FILE_TYPE_LABEL,
 } from "../_shared/qr-files.mjs";
 import { storeNamePayload } from "../_shared/qr-store-name.mjs";
 import { validateLogoId } from "../_shared/qr-logos.mjs";
@@ -94,7 +95,7 @@ async function verified(file: any) {
   )
     throw new FileError(
       400,
-      "ファイルの内容・種類・サイズが一致しません。正しいPDF・JPG・PNGを選択してください。",
+      `${QR_FILE_TYPE_LABEL}の内容・種類・サイズが一致しません。`,
     );
 }
 export async function publicFile(code: string, rpc: Rpc) {

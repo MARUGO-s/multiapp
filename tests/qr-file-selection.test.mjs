@@ -8,8 +8,9 @@ test("Picker and drop share selection restrictions without changing file identit
   assert.equal(selectedQrFile([]), null);
   assert.equal(selectedQrFile(null), null);
   assert.throws(() => selectedQrFile([pdf, pdf]), /1つずつ/);
+  assert.equal(selectedQrFile([{ name: "page.html", size: 100 }]).name, "page.html");
   assert.throws(
-    () => selectedQrFile([{ name: "page.html", size: 100 }]),
+    () => selectedQrFile([{ name: "logo.svg", size: 100 }]),
     /PDF/,
   );
   assert.throws(

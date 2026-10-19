@@ -10,6 +10,7 @@ import {
   fileSpecification,
   matchesFileSignature,
   QR_FILE_ACCEPT,
+  QR_FILE_TYPE_LABEL,
 } from "../supabase/functions/_shared/qr-files.mjs";
 
 function uploadFile(
@@ -145,7 +146,7 @@ export function QrFileUpload({
         )
       )
         throw new Error(
-          "ファイルの種類が一致しません。正しいPDF・JPG・PNGを選択してください。",
+          `${QR_FILE_TYPE_LABEL}の内容と一致しません。`,
         );
       if (!attempt.current)
         attempt.current = {
@@ -304,7 +305,7 @@ export function QrFileUpload({
                   : "ここにファイルをドラッグ＆ドロップ"}
               </strong>
               <span>またはクリックしてファイルを選ぶ</span>
-              <small>PDF・JPG・PNG ／ 1ファイル20MBまで ／ 1つずつ</small>
+              <small>{QR_FILE_TYPE_LABEL} ／ 1ファイル20MBまで ／ 1つずつ</small>
             </button>
           </div>
           <input
