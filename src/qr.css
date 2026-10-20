@@ -275,6 +275,40 @@
   font-size: 12px;
   font-weight: 400;
 }
+.qr-hourly {
+  margin-top: 22px;
+}
+.qr-hourly h3 {
+  margin: 0 0 4px;
+}
+/* All 24 hours stay visible without sideways scrolling. */
+.qr-hourly-chart {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .qr-hourly-chart text {
+    font-size: 24px;
+  }
+}
+.qr-hourly-bar {
+  fill: #c9c0f3;
+  pointer-events: none;
+  transition:
+    y 0.2s,
+    height 0.2s;
+}
+.qr-hourly-bar-active {
+  fill: var(--purple);
+}
+.qr-hourly-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+.qr-hourly-hit:focus {
+  outline: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+}
 .qr-table-scroll {
   overflow: auto;
   max-height: 480px;
@@ -381,6 +415,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .qr-chart-point,
+  .qr-hourly-bar,
   .qr-bar-track span {
     transition: none;
   }

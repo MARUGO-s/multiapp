@@ -127,16 +127,13 @@ def main() -> None:
                 for migration in sorted(MIGRATIONS.glob("*_qr_store_name.sql")):
                     print("Applying " + migration.name, flush=True)
                     sql(migration.read_text())
-                for migration in sorted(MIGRATIONS.glob("*_qr_html_file.sql")):
-                    print("Applying " + migration.name, flush=True)
-                    sql(migration.read_text())
         html_ready = not args.baseline and not args.store_baseline and not args.caption_baseline
         feature_tests = (["tests/qr-store-logo-database.sql"] if args.baseline or args.store_baseline
                          else ["tests/qr-store-name-database.sql", "tests/qr-store-name-validation.sql"])
         for test in args.sql or feature_tests + [
             "tests/qr-logo-database.sql", "tests/qr-logo-files-database.sql",
             "tests/qr-logo-regression-database.sql", "tests/qr-files.sql",
-            *(["tests/qr-html-file.sql"] if html_ready else []),
+            *(["tests/qr-html-file.sql", "tests/qr-hourly-analytics.sql"] if html_ready else []),
             "tests/qr-trash.sql",
             "tests/qr-analytics.sql", "tests/qr-unique.sql", "tests/qr-accounts.sql",
         ]:
@@ -145,6 +142,17 @@ def main() -> None:
             path = (ROOT / test).resolve()
             if not path.is_relative_to(ROOT / "tests"):
                 raise ValueError("SQL tests must live within repository tests/")
+            # Later additive migrations run after the caption boundary so its
+            # exact before/after snapshot stays valid; following tests then
+            # exercise the newest definitions.
+            later = {
+                "tests/qr-html-file.sql": "*_qr_html_file.sql",
+                "tests/qr-hourly-analytics.sql": "*_qr_hourly_analytics.sql",
+            }
+            if test in later:
+                for migration in sorted(MIGRATIONS.glob(later[test])):
+                    print("Applying " + migration.name, flush=True)
+                    sql(migration.read_text())
             print("Executing " + str(path.relative_to(ROOT)), flush=True)
             sql(path.read_text())
         if args.concurrency or not args.sql:
