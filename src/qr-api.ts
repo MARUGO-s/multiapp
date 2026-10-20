@@ -62,6 +62,8 @@ export type QrAnalyticsData = {
     unknownCount: number;
     botCount: number;
   }[];
+  /** Hours 0-23, Japan time. Absent from servers that predate it. */
+  hourly?: { hour: number; count: number; uniqueCount: number }[];
   periodTotal: number;
   periodUnique: number;
   totalUnique: number;

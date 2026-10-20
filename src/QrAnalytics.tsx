@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { useQrApi, type QrAnalyticsData } from "./qr-api";
-import { chartGeometry } from "./qr-chart.mjs";
+import { chartGeometry, hourlyGeometry } from "./qr-chart.mjs";
 import { sourceLabels, deviceLabels, browserLabels } from "./qr-labels.mjs";
 import {
   browserReferenceCount,
@@ -100,6 +100,181 @@ function Breakdown({
 }
 
 const shortDate = (date: string) => date.slice(5).replace("-", "/");
+const hourRange = (hour: number) => `${hour}時台（${hour}:00〜${hour}:59）`;
+function HourlyChart({
+  hourly,
+  metric,
+  days,
+  view,
+  showReference,
+}: {
+  hourly: { hour: number; count: number; uniqueCount: number }[];
+  metric: "accesses" | "unique";
+  days: number;
+  view: "chart" | "table";
+  showReference: boolean;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const unit = metric === "unique" ? "件" : "回";
+  const metricLabel =
+    metric === "unique" ? "ブラウザー参考値" : "延べアクセス数";
+  const chart = hourlyGeometry(
+    hourly.map((h) => ({
+      hour: h.hour,
+      count:
+        metric === "unique"
+          ? browserReferenceCount(h.uniqueCount, h.count)
+          : h.count,
+    })),
+  );
+  const shown = hover ?? chart.peakHour;
+  const shownBar = shown === null ? null : chart.bars[shown];
+  const valueText = (count: number | null) =>
+    count === null ? "未計測・対象外" : `${count.toLocaleString()}${unit}`;
+  return (
+    <section className="qr-hourly" aria-label="時間帯別アクセス">
+      <h3>時間帯別（日本時間）</h3>
+      <p className="qr-analysis-meta">
+        直近{days}日のアクセスを、開かれた時刻の「時」ごとに合計しています。
+      </p>
+      {view === "chart" ? (
+        <>
+          <div className="qr-chart-scroll">
+            <svg
+              viewBox={`0 0 ${chart.width} ${chart.height}`}
+              className="qr-trend-chart qr-hourly-chart"
+              role="group"
+              aria-label={`時間帯別の${metricLabel}。各棒を選ぶと時間帯の値を確認できます。`}
+            >
+              {chart.ticks.map((tick) => (
+                <g key={tick.value} aria-hidden="true">
+                  <line
+                    x1={chart.left}
+                    x2={chart.width - chart.right}
+                    y1={tick.y}
+                    y2={tick.y}
+                    className="qr-chart-grid"
+                  />
+                  <text x={chart.left - 10} y={tick.y + 5} textAnchor="end">
+                    {tick.value.toLocaleString()}
+                  </text>
+                </g>
+              ))}
+              <text x={chart.left} y={22} aria-hidden="true">
+                {metricLabel}（{unit}）
+              </text>
+              {chart.bars.map((bar) => (
+                <g key={bar.hour}>
+                  <rect
+                    x={bar.x - 2}
+                    y={chart.top}
+                    width={bar.width + 4}
+                    height={chart.height - chart.top - chart.bottom}
+                    className="qr-hourly-hit"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${hourRange(bar.hour)}：${valueText(bar.count)}`}
+                    onMouseEnter={() => setHover(bar.hour)}
+                    onFocus={() => setHover(bar.hour)}
+                    onClick={() => setHover(bar.hour)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setHover(bar.hour);
+                      }
+                    }}
+                  >
+                    <title>{`${hourRange(bar.hour)}：${valueText(bar.count)}`}</title>
+                  </rect>
+                  <rect
+                    x={bar.x}
+                    y={bar.y}
+                    width={bar.width}
+                    height={bar.height}
+                    rx={2}
+                    className={
+                      shown === bar.hour
+                        ? "qr-hourly-bar qr-hourly-bar-active"
+                        : "qr-hourly-bar"
+                    }
+                    aria-hidden="true"
+                  />
+                  {bar.hour % 3 === 0 && (
+                    <text
+                      x={bar.center}
+                      y={chart.height - 18}
+                      textAnchor="middle"
+                      aria-hidden="true"
+                    >
+                      {bar.hour}
+                    </text>
+                  )}
+                </g>
+              ))}
+              <text
+                x={chart.width - chart.right}
+                y={chart.height - 2}
+                textAnchor="end"
+                aria-hidden="true"
+              >
+                時
+              </text>
+            </svg>
+          </div>
+          <p className="qr-chart-readout" role="status">
+            {shownBar
+              ? `${hourRange(shownBar.hour)}：${metricLabel} ${valueText(shownBar.count)}`
+              : "この期間のアクセスはまだありません。"}
+            <span>
+              {hover === null && shownBar
+                ? "いちばん多い時間帯を表示しています。棒に触れるか選択すると、その時間帯の値を確認できます。"
+                : "棒に触れるか選択すると、その時間帯の値を確認できます。"}
+            </span>
+          </p>
+        </>
+      ) : (
+        <div
+          className="qr-table-scroll"
+          tabIndex={0}
+          role="region"
+          aria-label="時間帯別アクセス数の表"
+        >
+          <table className="qr-data-table">
+            <caption>時間帯別アクセス数（日本時間・直近{days}日）</caption>
+            <thead>
+              <tr>
+                <th scope="col">時間帯</th>
+                <th scope="col">延べアクセス</th>
+                {showReference && (
+                  <th scope="col">ブラウザー参考値</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {chart.bars.map((bar) => {
+                const row = hourly.find((h) => h.hour === bar.hour);
+                return (
+                  <tr key={bar.hour}>
+                    <th scope="row">{hourRange(bar.hour)}</th>
+                    <td>{(row?.count ?? 0).toLocaleString()}回</td>
+                    {showReference && (
+                      <td>
+                        {formatBrowserReference(
+                          row?.uniqueCount ?? 0,
+                          row?.count ?? 0,
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 function ReferenceValue({
   unique,
   accesses,
@@ -552,6 +727,15 @@ export function QrAnalytics({
                 </tfoot>
               </table>
             </div>
+          )}
+          {current.hourly && (
+            <HourlyChart
+              hourly={current.hourly}
+              metric={metric}
+              days={days}
+              view={view}
+              showReference={showReference}
+            />
           )}
           <div className="qr-breakdown-grid">
             <Breakdown
