@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ページが見つかりません — MARUGO</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; color: #262b3b; background: #f6f7fb; margin: 0; padding: 48px 20px; text-align: center; }
+  a { color: #5c488f; }
+</style>
+</head>
+<body>
+<p id="msg">ページが見つかりません。</p>
+<p><a href="/">MARUGOのトップへ</a></p>
+<script>
+// A newly published HTML file's LINE card page (/s/<code>.html) exists only
+// after the next site build. Until then, forward to the same measured URL
+// the card page would open, so the visitor still reaches the file.
+(function () {
+  var match = /^((?:\/[A-Za-z0-9_-]+)*)\/s\/([A-Za-z0-9_-]{12})\.html$/.exec(location.pathname);
+  if (!match) return;
+  var marker = new URLSearchParams(location.search).get("s");
+  var source = marker === "q" || marker === "b" || marker === "l" ? marker : "l";
+  location.replace(match[1] + "/?s=" + source + "#" + match[2]);
+})();
+</script>
+</body>
+</html>
