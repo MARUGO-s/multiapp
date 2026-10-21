@@ -1105,6 +1105,25 @@ Deno.test(
           })).status,
           400,
         );
+        // Speaker names are a display mapping: the transcript and minutes stay as saved.
+        const beforeNames = await (await request(`/meetings/${meeting.id}`, "valid-a")).json();
+        const named = await (await request(`/meetings/${meeting.id}`, "valid-a", {
+          method: "PATCH",
+          body: JSON.stringify({ speakerNames: { "録音1:話者0": "佐藤", "録音2:話者0": "田中" } }),
+        })).json();
+        assert.deepEqual(named.speakerNames, { "録音1:話者0": "佐藤", "録音2:話者0": "田中" });
+        assert.equal(named.transcript, beforeNames.transcript);
+        assert.equal(named.markdown, beforeNames.markdown);
+        assert.equal(named.minutesStale, beforeNames.minutesStale);
+        const renamedAgain = await (await request(`/meetings/${meeting.id}`, "valid-b", {
+          method: "PATCH",
+          body: JSON.stringify({ speakerNames: { "録音1:話者0": "鈴木" } }),
+        })).json();
+        assert.deepEqual(renamedAgain.speakerNames, { "録音1:話者0": "鈴木" }, "the whole mapping is replaced");
+        for (const speakerNames of [{ "録音1:話者0": " " }, { ["x".repeat(101)]: "佐藤" }, { "録音1:話者0": "あ".repeat(101) }])
+          assert.equal((await request(`/meetings/${meeting.id}`, "valid-a", {
+            method: "PATCH", body: JSON.stringify({ speakerNames }),
+          })).status, 400);
         const edited = await request(`/meetings/${meeting.id}`, "valid-a", {
           method: "PATCH",
           body: JSON.stringify({ markdown: "手動修正" }),
