@@ -5,7 +5,7 @@ export const MINUTES_FORMATS = Object.freeze([
     label: "要約版",
     description: "主な方針・決定事項と、次の対応を短く整理します。",
     instruction:
-      "要点を簡潔にまとめる。内容要旨は短い段落とし、topicsは結論の理解に不可欠な議題だけに絞る。背景説明は必要最小限にする。ただし重要な決定・作業・担当・期限・未解決事項は省略しない。",
+      "要点を簡潔にまとめる。summaryは短い段落とし、topicsは結論の理解に不可欠な議題だけに絞り、各議題のpointsは1〜2項目にする。背景説明は必要最小限にする。ただし重要な決定・作業・担当・期限・未定事項は省略しない。",
   }),
   Object.freeze({
     id: "standard",
@@ -23,8 +23,11 @@ export const MINUTES_FORMATS = Object.freeze([
   }),
 ]);
 
+// Shown beside each topic title so readers see which topics reached a conclusion.
+export const TOPIC_STATUSES = Object.freeze(["決定", "提案", "継続検討", "報告"]);
+
 export const MINUTES_FORMAT_GUIDANCE =
-  "共通構成：内容要旨 → 決定事項 → 議題別の内容 → 次の対応（担当・期限） → 継続検討・確認事項 → 次回会議。会議内容に応じて項目・議題の分け方・分量を調整し、該当しない項目は省略します。ページ数は固定しません。";
+  "共通構成：基本情報（日時・参加者・記録の範囲・次回会議） → 概要（2〜3文） → 決定事項（補足付き） → 次の対応（担当・時期） → 議題ごとの要点（状態つき） → 未定・要確認 → 記録上の注意。次回会議は明確な言及がある場合だけ載せます。会議内容に応じて議題の分け方・分量を調整し、該当しない項目は省略します。ページ数は固定しません。";
 
 export function minutesFormat(id) {
   return (

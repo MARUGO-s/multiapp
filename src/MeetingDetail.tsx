@@ -209,6 +209,15 @@ export function MeetingDetail({
   const view = minutesView(m, viewFormat);
   const hasAllFormats = view.available.length === MINUTES_FORMATS.length;
   useEffect(() => { setViewFormat(m.template); }, [m.id]);
+  useEffect(() => {
+    // Read by the @page footer when the minutes are printed or saved as PDF.
+    const name = m.title.endsWith("議事録") ? m.title : `${m.title} 議事録`;
+    const root = document.documentElement.style;
+    root.setProperty("--minutes-footer", JSON.stringify(`${name}　${m.date}`));
+    return () => {
+      root.removeProperty("--minutes-footer");
+    };
+  }, [m.title, m.date]);
   const audio = useRef<HTMLAudioElement>(null);
   const [audioSource, setAudioSource] = useState("");
   const [audioPart, setAudioPart] = useState(0);
@@ -1010,6 +1019,12 @@ export function MeetingDetail({
                 ? transcriptionModelName(m.transcriptionModel)
                 : "文字起こし済みテキスト"}
             </p>
+            {m.minutes?.recordScope && (
+              <p>
+                <span>記録の範囲</span>
+                {m.minutes.recordScope}
+              </p>
+            )}
             <small>
               AIの出力は元の会話と照合し、必要に応じて編集してください。
             </small>

@@ -8,12 +8,18 @@ export interface Action {
 export interface Minutes {
   formats?: Record<Meeting["template"], {
     summary: string;
-    topics: { title: string; points: string[] }[];
+    topics: { title: string; points: string[]; notes?: string[] }[];
   }>;
   scheduleEvents?: ScheduleEvent[];
   summary: string;
-  topics: { title: string; points: string[] }[];
+  topics: { title: string; points: string[]; notes?: string[] }[];
   decisions: string[];
+  /** Same order as decisions; "" when a decision has no note. */
+  decisionNotes?: string[];
+  /** 記録の範囲, e.g. 録音1〜5の断片. */
+  recordScope?: string;
+  /** What the record cannot confirm, shown under the open items. */
+  recordNotes?: string[];
   actions: Action[];
   openQuestions: string[];
   documentReview?: {

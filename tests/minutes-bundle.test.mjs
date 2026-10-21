@@ -5,7 +5,7 @@ import { AllFormatsMinutesSchema, parseMinutes, summaryInput } from "../supabase
 import { minutesDocuments, minutesForFormat, minutesMarkdownPatch, PatchSchema } from "../supabase/functions/_shared/domain.mjs";
 import { minutesView } from "../src/minutes-views.mjs";
 import { createDemo } from "../server/demo.mjs";
-import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
+import { legacyMinutesBundle, minutesBundle } from "./fixtures/minutes-bundle.mjs";
 
 const meeting = () => ({ ...createDemo(), template: "standard", isDemo: false });
 function generated() {
@@ -85,4 +85,41 @@ test("部分的な3形式や不正な編集指定を拒否する", () => {
   assert.throws(() => parseMinutes(m, bundle));
   for (const patch of [{ markdownFormat: "brief" }, { markdown: "x", markdownFormat: "invalid" }, { markdownByFormat: { brief: "任意の上書き" } }])
     assert.equal(PatchSchema.safeParse(patch).success, false);
+});
+test("決定の補足・議題ごとの記録上の注意・記録の範囲を受け取り、保存後の再読込や以前の応答でも失わない", () => {
+  const m = meeting();
+  const schema = z.toJSONSchema(AllFormatsMinutesSchema);
+  for (const field of ["recordScope", "decisionItems", "recordNotes"])
+    assert.ok(schema.required.includes(field), field);
+  assert.deepEqual(schema.properties.decisionItems.items.required, ["decision", "note"]);
+  assert.deepEqual(
+    schema.properties.formats.properties.detailed.properties.topics.items.required,
+    ["title", "status", "points", "notes"],
+  );
+  const bundle = minutesBundle({
+    ...m.minutes,
+    recordScope: "録音1〜5の断片",
+    decisionNotes: ["一般公開の時期は未定。", ""],
+    recordNotes: ["話者番号と実名の対応は推定していません。"],
+  });
+  const minutes = parseMinutes(m, bundle);
+  assert.equal(Object.hasOwn(minutes, "decisionItems"), false);
+  assert.deepEqual(minutes.decisions, m.minutes.decisions);
+  assert.deepEqual(minutes.decisionNotes, ["一般公開の時期は未定。", ""]);
+  assert.equal(minutes.recordScope, "録音1〜5の断片");
+  assert.deepEqual(minutes.topics, minutes.formats.standard.topics);
+  assert.deepEqual(minutes.formats.detailed.topics[1].notes, m.minutes.topics[1].notes);
+  assert.deepEqual(parseMinutes(m, minutes), minutes, "保存した形をもう一度読んでも変わらない");
+  const { markdown } = minutesDocuments(m, minutes);
+  assert.match(markdown, /記録の範囲：録音1〜5の断片/);
+  assert.match(markdown, /- 10月15日に既存のお客様限定でサービスを公開する。\n  - 一般公開の時期は未定。\n- 料金プラン/);
+  assert.match(markdown, /- ※エラー表示をどこまで変更するかは/);
+  assert.match(markdown, /### リリース方針とスケジュール ［決定］[\s\S]*### デザイン・開発の進捗 ［報告］/);
+  assert.equal(z.toJSONSchema(AllFormatsMinutesSchema).properties.formats.properties.brief.properties.topics.items.properties.status.enum.join("・"), "決定・提案・継続検討・報告");
+  assert.match(markdown, /> 話者番号と実名の対応は推定していません。$/);
+  // Responses that were already running when these fields were added.
+  const legacy = parseMinutes(m, legacyMinutesBundle(m.minutes));
+  assert.deepEqual(legacy.decisions, m.minutes.decisions);
+  assert.equal(legacy.recordScope, undefined);
+  assert.match(minutesDocuments(m, legacy).markdown, /## 決定事項\n\n- 10月15日/);
 });

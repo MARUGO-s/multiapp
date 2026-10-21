@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { minutesFormat } from "./minutes-formats.mjs";
+import { TOPIC_STATUSES } from "./minutes-formats.mjs";
 
 export const MAX_FILE_SIZE = 24 * 1000 * 1000;
 export const MAX_TEXT_LENGTH = 100_000;
@@ -144,41 +144,40 @@ export function transcriptFromSegments(segments, names = {}) {
     .join("\n\n");
 }
 
+const japaneseDate = (date) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date || "");
+  return match
+    ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日`
+    : date;
+};
+
+// Layout of the minutes the chefs' meetings use: decisions first, then tasks,
+// topic points, open items as a checklist and notes on what the record lacks.
 export function minutesToMarkdown(meeting, minutes) {
-  const lines = [
-    `# ${meeting.title}`,
-    "",
-    `日時：${meeting.date}`,
-    `参加者：${meeting.participants || "未記入"}`,
-    "",
-    `議事録形式：${minutesFormat(meeting.template).label}`,
-    "",
-    "## 内容要旨",
-    "",
-    minutes.summary,
-  ];
-  if (minutes.decisions.length) {
-    lines.push(
-      "",
-      "## 決定事項",
-      "",
-      ...minutes.decisions.map((d) => `- ${d}`),
-    );
-  }
   const nextMeetings = minutes.topics.filter(
     (topic) => topic.title.trim() === "次回会議",
   );
   const topics = minutes.topics.filter(
     (topic) => topic.title.trim() !== "次回会議",
   );
-  if (topics.length) lines.push("", "## 議事内容");
-  for (const topic of topics) {
-    lines.push(
-      "",
-      `### ${topic.title}`,
-      "",
-      ...topic.points.map((p) => `- ${p}`),
-    );
+  const nextMeeting = nextMeetings[0]?.points[0]?.replace(/^日時[：:]\s*/, "");
+  const lines = [
+    `# ${meeting.title}`,
+    "",
+    `日時：${japaneseDate(meeting.date)}`,
+    `参加者：${meeting.participants || "記録なし"}`,
+    ...(minutes.recordScope ? [`記録の範囲：${minutes.recordScope}`] : []),
+    ...(nextMeeting ? [`次回会議：${nextMeeting}`] : []),
+  ];
+  // A short overview lets readers who were absent follow the rest.
+  if (minutes.summary?.trim()) lines.push("", minutes.summary.trim());
+  if (minutes.decisions.length) {
+    lines.push("", "## 決定事項", "");
+    minutes.decisions.forEach((decision, i) => {
+      lines.push(`- ${decision}`);
+      const note = minutes.decisionNotes?.[i]?.trim();
+      if (note) lines.push(`  - ${note}`);
+    });
   }
   if (minutes.actions.length) {
     const cell = (value) =>
@@ -190,7 +189,7 @@ export function minutesToMarkdown(meeting, minutes) {
       "",
       "## 次の対応",
       "",
-      "| 対応内容 | 担当 | 期限・時期 |",
+      "| 対応内容 | 担当 | 時期 |",
       "| --- | --- | --- |",
       ...minutes.actions.map(
         (a) =>
@@ -198,12 +197,17 @@ export function minutesToMarkdown(meeting, minutes) {
       ),
     );
   }
-  if (minutes.openQuestions.length) {
+  if (topics.length) lines.push("", "## 議題ごとの要点");
+  for (const topic of topics) {
+    const status = TOPIC_STATUSES.includes(topic.status)
+      ? ` ［${topic.status}］`
+      : "";
     lines.push(
       "",
-      "## 継続検討・確認事項",
+      `### ${topic.title}${status}`,
       "",
-      ...minutes.openQuestions.map((q) => `- ${q}`),
+      ...topic.points.map((p) => `- ${p}`),
+      ...(topic.notes || []).map((note) => `- ※${note}`),
     );
   }
   if (nextMeetings.length) {
@@ -216,6 +220,17 @@ export function minutesToMarkdown(meeting, minutes) {
       ),
     );
   }
+  if (minutes.openQuestions.length) {
+    lines.push(
+      "",
+      "## 未定・要確認",
+      "",
+      ...minutes.openQuestions.map((q) => `- [ ] ${q}`),
+    );
+  }
+  const recordNotes = (minutes.recordNotes || []).filter((note) => note.trim());
+  if (recordNotes.length)
+    lines.push("", ...recordNotes.map((note) => `> ${note}`));
   if (minutes.documentReview?.length) {
     lines.push("", "## 添付資料との照合", "");
     for (const review of minutes.documentReview) {
