@@ -141,9 +141,22 @@ export async function audioUrl(id: string, part = 0) {
   return (await api<{ url: string }>(path)).url;
 }
 
+export async function audioBlob(id: string, part = 0) {
+  const url = await audioUrl(id, part);
+  const failed = "音声を取得できませんでした。通信状況を確認して再度お試しください。";
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error(failed);
+  }
+  if (!response.ok) throw new Error(failed);
+  return response.blob();
+}
+
 export function download(
   name: string,
-  content: string,
+  content: BlobPart,
   type = "text/plain;charset=utf-8",
 ) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -151,7 +164,8 @@ export function download(
   link.href = url;
   link.download = name.replace(/[\\/:*?"<>|]/g, "_");
   link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Large audio files can take a moment before the browser starts reading them.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export { exportToICS, exportMultipleMeetings } from "./meeting-exports.mjs";

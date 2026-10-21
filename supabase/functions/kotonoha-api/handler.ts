@@ -12,6 +12,7 @@ import { SummaryRequest, TagsRequest, periodMeetings, insightRequest, parseInsig
 import {
   MAX_FILE_SIZE,
   MAX_TEXT_LENGTH,
+  MINUTES_MODELS,
   MetadataSchema,
   RetrySchema,
   minutesDocuments,
@@ -110,7 +111,7 @@ const encryptionSecret = Deno.env.get("KOTONOHA_KEY_ENCRYPTION_SECRET") || "";
 const OPENAI_TRANSCRIPTION_MODEL = "gpt-transcribe";
 const settingsSchema = z
   .object({
-    model: z.enum(["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"]),
+    model: z.enum(MINUTES_MODELS),
     transcriptionModel: z
       .enum([OPENAI_TRANSCRIPTION_MODEL, GEMINI_TRANSCRIPTION_MODEL])
       .default(OPENAI_TRANSCRIPTION_MODEL),
@@ -1605,7 +1606,9 @@ export async function handler(req: Request) {
       return json({ url: data.signedUrl });
     }
     if (match[2] === "retry" && req.method === "POST") {
-      const options = RetrySchema.parse(await jsonBody(req, true));
+      const { model, ...options } = RetrySchema.parse(
+        await jsonBody(req, true),
+      );
       if (record.document.status === "bot") {
         throw fail(409, "Botの録音が届くまでお待ちください。");
       }
@@ -1635,7 +1638,7 @@ export async function handler(req: Request) {
           ? "transcribing"
           : "analyzing",
         error: null,
-        minutesModel: config.model,
+        minutesModel: model || config.model,
         transcriptionModel: retryTranscriptionModel,
         transcriptionWait: null,
         geminiRetryCount: 0,

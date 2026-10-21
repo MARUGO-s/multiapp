@@ -31,10 +31,14 @@ export const MetadataSchema = z.object({
   template: z.enum(["standard", "brief", "detailed"]).default("standard"),
 });
 
-// Omitted options preserve the saved depth for older clients and error retries.
+export const MINUTES_MODELS = ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"];
+
+// Omitted options preserve the saved depth for older clients and error retries;
+// an omitted model means the connection settings' model, as before.
 export const RetrySchema = z
   .object({
     template: MetadataSchema.shape.template.removeDefault().optional(),
+    model: z.enum(MINUTES_MODELS).optional(),
   })
   .strict();
 

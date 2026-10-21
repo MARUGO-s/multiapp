@@ -1595,7 +1595,37 @@ Deno.test(
         calls.filter((c) => c.route.endsWith("/transcriptions")).length,
         transcribedBefore,
       );
-      const insightMeeting = { ...createDemo(), isDemo: false, source: "text", analysisId: crypto.randomUUID() };
+      // A model chosen for one regeneration is used and billed without changing the settings.
+      const settingsModel = (await (await request("/settings", "valid-b")).json()).model;
+      const regenerated = () => rows.get(documentMeeting.id).document;
+      const beforeModel = structuredClone(regenerated());
+      for (const body of ['{"model":"gpt-4o"}', '{"model":null}', '{"model":""}']) {
+        assert.equal((await request(`${docRoute}/retry`, "valid-b", { method: "POST", body })).status, 400);
+        assert.deepEqual(regenerated(), beforeModel);
+      }
+      const chosenModel = settingsModel === "gpt-6-luna" ? "gpt-6-sol" : "gpt-6-luna";
+      const modelRetry = await request(`${docRoute}/retry`, "valid-b", {
+        method: "POST",
+        body: JSON.stringify({ model: chosenModel }),
+      });
+      assert.equal(modelRetry.status, 202);
+      assert.equal((await modelRetry.json()).minutesModel, chosenModel);
+      await drain();
+      await request("/meetings");
+      await drain();
+      assert.equal(regenerated().status, "done");
+      assert.equal(regenerated().minutesModel, chosenModel);
+      assert.equal(regenerated().template, "detailed");
+      assert.equal(regenerated().model, undefined);
+      assert.equal(calls.filter((c) => c.route === "/v1/responses").at(-1)!.body.model, chosenModel);
+      assert.ok([...usageEvents.values()].some((e) =>
+        e.meetingId === documentMeeting.id && e.kind === "minutes" && e.model === chosenModel));
+      assert.equal((await (await request("/settings", "valid-b")).json()).model, settingsModel);
+      assert.equal(
+        calls.filter((c) => c.route.endsWith("/transcriptions")).length,
+        transcribedBefore,
+      );
+      const insightMeeting ={ ...createDemo(), isDemo: false, source: "text", analysisId: crypto.randomUUID() };
       rows.set(insightMeeting.id, { owner, document: insightMeeting, audioPath: null, responseId: null });
       const postInsight = (body: any) => ({ method: "POST", body: JSON.stringify(body) });
       assert.equal((await request("/summary", "invalid", postInsight({ period: "month" }))).status, 401);

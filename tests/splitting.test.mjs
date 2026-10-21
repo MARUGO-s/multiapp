@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Input, ALL_FORMATS, BlobSource, EncodedPacketSink } from "mediabunny";
-import { splitRecordings } from "../src/split-recordings.mjs";
+import { joinRecordings, splitRecordings } from "../src/split-recordings.mjs";
+import {
+  audioFileName,
+  recordingFiles,
+  savedAudioExtension,
+} from "../src/recording-files.mjs";
 import {
   validateAdts,
   transcribeRecordings,
@@ -320,4 +325,87 @@ test("分割文字起こしは1回1本、保存済みをスキップし最終回
     else assert.ok(text.endsWith("会話7"));
   }
   assert.deepEqual(calls, [0, 1, 2, 3, 4, 5, 6, 7]);
+});
+
+async function readJoined(blob) {
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+  try {
+    const track = await input.getPrimaryAudioTrack();
+    const packets = [];
+    let last = -Infinity;
+    for await (const packet of new EncodedPacketSink(track).packets()) {
+      assert.ok(packet.timestamp > last, "timestamps keep increasing across parts");
+      last = packet.timestamp;
+      packets.push(packet.data);
+    }
+    return { codec: await track.getCodec(), duration: await input.computeDuration(), packets };
+  } finally {
+    input.dispose();
+  }
+}
+test("自動分割した録音を元の順序で1ファイルに戻し、音声データを欠落・重複なく保持する", async () => {
+  const aac = new File([aacFixture, aacFixture], "first.aac");
+  const wav = waveFile(176400 * 3 + 44);
+  for (const [file, durationLimit, codec, extension, type] of [
+    [aac, 0.05, "aac", ".m4a", "audio/mp4"],
+    [wav, 1, "pcm-s16", ".wav", "audio/wav"],
+  ]) {
+    const parts = await splitRecordings([file], () => {}, { durationLimit });
+    assert.ok(parts.length > 2, file.name);
+    const expected = (await readParts(parts)).flatMap((p) => p.packets);
+    const joined = await joinRecordings(parts.map((p) => p.blob));
+    assert.equal(joined.extension, extension);
+    assert.equal(joined.blob.type, type);
+    const actual = await readJoined(joined.blob);
+    assert.equal(actual.codec, codec);
+    assert.deepEqual(actual.packets, expected, file.name);
+    const total = parts.reduce((n, p) => n + p.duration, 0);
+    assert.ok(Math.abs(actual.duration - total) < 0.05, `${file.name}: ${actual.duration}`);
+  }
+  const wavPcm = new Uint8Array(await wav.slice(44).arrayBuffer());
+  const wavParts = await splitRecordings([wav], () => {}, { durationLimit: 1 });
+  const joinedWav = await readJoined((await joinRecordings(wavParts.map((p) => p.blob))).blob);
+  assert.deepEqual(Buffer.concat(joinedWav.packets), Buffer.from(wavPcm));
+  const [aacPart] = await splitRecordings([aac]);
+  await assert.rejects(
+    joinRecordings([aacPart.blob, wavParts[0].blob]),
+    /形式が一致しない/,
+  );
+  await assert.rejects(joinRecordings([]), /音声が空です/);
+});
+test("録音ごとのダウンロードファイルにまとめ、保存形式の拡張子で名前を付ける", () => {
+  assert.deepEqual(
+    publicRecordings([
+      { fileName: "定例.mp3（1）", transcript: "済み", audioPath: "owner/secret.mp3", sourceIndex: 0 },
+      { fileName: "旧.wav", transcript: "" },
+    ]),
+    [
+      { fileName: "定例.mp3（1）", transcribed: true, sourceIndex: 0 },
+      { fileName: "旧.wav", transcribed: false },
+    ],
+  );
+  assert.deepEqual(
+    recordingFiles([
+      { fileName: "定例.mp3（1）", sourceIndex: 0 },
+      { fileName: "定例.mp3（2）", sourceIndex: 0 },
+      { fileName: "追加（2）.AAC（1）", sourceIndex: 1 },
+    ]),
+    [
+      { name: "定例.mp3", parts: [0, 1] },
+      { name: "追加（2）.AAC", parts: [2] },
+    ],
+  );
+  // Whole files saved before automatic splitting are each their own download.
+  assert.deepEqual(
+    recordingFiles([{ fileName: "前半.wav" }, { fileName: "前半.wav" }]),
+    [
+      { name: "前半.wav", parts: [0] },
+      { name: "前半.wav", parts: [1] },
+    ],
+  );
+  assert.equal(audioFileName("追加.AAC", savedAudioExtension("audio/mp4", "追加.AAC")), "追加.m4a");
+  assert.equal(audioFileName("定例.mp3", ".mp3"), "定例.mp3");
+  assert.equal(savedAudioExtension("application/octet-stream", "録音.WAV"), ".wav");
+  assert.equal(savedAudioExtension("audio/ogg; codecs=opus", "x"), ".ogg");
+  assert.equal(audioFileName(".m4a", ".m4a"), "録音.m4a");
 });

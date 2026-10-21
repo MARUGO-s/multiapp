@@ -202,6 +202,67 @@ export async function splitRecordings(
   return parts;
 }
 
+// The reverse of splitRecordings for one recording: the parts' packets are copied
+// (not re-encoded) into one file, each part starting where the previous one ended.
+export async function joinRecordings(blobs) {
+  const target = new BufferTarget();
+  let output, source, codec, decoderConfig, fileType, added = false,
+    offset = 0;
+  try {
+    for (const blob of blobs) {
+      const input = new Input({
+        source: new BlobSource(blob),
+        formats: ALL_FORMATS,
+      });
+      try {
+        const track = await input.getPrimaryAudioTrack();
+        if (!track) throw new Error("音声トラックがありません。");
+        const partCodec = await track.getCodec();
+        if (!output) {
+          codec = partCodec;
+          if (
+            !codec ||
+            !formatFor(codec).getSupportedAudioCodecs().includes(codec)
+          )
+            throw new Error(unsupported(codec));
+          fileType = fileTypeFor(codec);
+          decoderConfig = await track.getDecoderConfig();
+          output = new Output({ format: formatFor(codec), target });
+          source = new EncodedAudioPacketSource(codec);
+          output.addAudioTrack(source);
+          await output.start();
+        } else if (partCodec !== codec)
+          throw new Error("分割した録音の形式が一致しないため、1つにまとめられません。");
+        let first,
+          end = offset;
+        for await (const packet of new EncodedPacketSink(track).packets()) {
+          first ??= packet.timestamp;
+          const timestamp = offset + packet.timestamp - first;
+          await source.add(
+            packet.clone({ timestamp }),
+            added ? undefined : { decoderConfig },
+          );
+          added = true;
+          end = Math.max(end, timestamp + packet.duration);
+        }
+        offset = end;
+      } finally {
+        input.dispose();
+      }
+    }
+    if (!added) throw new Error("音声が空です。");
+    await output.finalize();
+  } catch (error) {
+    if (output && output.state !== "finalized")
+      await output.cancel().catch(() => {});
+    throw error;
+  }
+  return {
+    blob: new Blob([target.buffer], { type: fileType.type }),
+    extension: fileType.extension,
+  };
+}
+
 // Equal-length segments avoid a tiny trailing part; each stays within the limit.
 async function transcode(input, track, codec, durationLimit, addPart, report) {
   if (codec === "ac3" || codec === "eac3") await loadAc3Decoder();
