@@ -23,13 +23,15 @@ function harness(
   const location = new URL(url);
   location.assign = (target) => redirects.push(target);
   const module = { exports: {} };
+  let sharedSession = null;
+  let nativeSession = { access_token: "test.native.jwt", user: { id: "test" } };
   const auth = {
     async signInWithOAuth(options) {
       oauth.push(options);
       return { data: { url: "https://accounts.google.com/test" }, error: null };
     },
     getSession: async () => ({
-      data: { session: { access_token: "test.native.jwt" } },
+      data: { session: nativeSession },
       error: null,
     }),
     onAuthStateChange(fn) {
@@ -104,6 +106,7 @@ function harness(
         return {
           SUPABASE_URL: "https://test.invalid",
           SUPABASE_PUBLISHABLE_KEY: "public-only",
+          getSession: () => sharedSession,
         };
       if (name === "./qr-account-routing.mjs") return routing;
       throw new Error(name);
@@ -114,6 +117,12 @@ function harness(
     changes,
     oauth,
     redirects,
+    setSharedSession(value) {
+      sharedSession = value;
+    },
+    setNativeSession(value) {
+      nativeSession = value;
+    },
     get exchanges() {
       return exchanges;
     },
@@ -122,6 +131,21 @@ function harness(
     },
   };
 }
+test("QR uses the explicit password session ahead of an old native account, never a Google bridge", async () => {
+  const h = harness("https://marugo-s.github.io/multiapp/");
+  h.setSharedSession({
+    token: "ktn_password_session",
+    expiresAt: "2099-01-01",
+  });
+  assert.equal((await h.client.qrCredentials()).kind, "shared");
+  assert.equal(await h.client.qrAccessToken(), "ktn_password_session");
+  h.setSharedSession({ token: "ktn_google_bridge", googleUserId: "test" });
+  assert.equal((await h.client.qrCredentials()).kind, "account");
+  assert.equal(await h.client.qrAccessToken(), "test.native.jwt");
+  h.setSharedSession(null);
+  h.setNativeSession(null);
+  await assert.rejects(h.client.qrAccessToken(), /ログイン/);
+});
 test("QR Auth uses isolated storage and explicit PKCE callbacks", async () => {
   const h = harness(
     "https://marugo-s.github.io/multiapp/?account=confirm&code=one-use",
@@ -156,11 +180,16 @@ test("QR Google login is opt-in, uses isolated PKCE and has no additional scopes
   assert.deepEqual(enabled.redirects, ["https://accounts.google.com/test"]);
 });
 test("The common portal Google flag works without enabling the old QR-only flag", async () => {
-  const h = harness("https://marugo-s.github.io/multiapp/", { portalEnabled: true });
+  const h = harness("https://marugo-s.github.io/multiapp/", {
+    portalEnabled: true,
+  });
   assert.equal(h.client.qrGoogleAuthEnabled, false);
   assert.equal(h.client.portalGoogleAuthEnabled, true);
   await h.client.signInQrWithGoogle();
-  assert.equal(h.oauth[0].options.redirectTo, "https://marugo-s.github.io/multiapp/?account=google");
+  assert.equal(
+    h.oauth[0].options.redirectTo,
+    "https://marugo-s.github.io/multiapp/?account=google",
+  );
   assert.equal(h.options.auth.storageKey, "marugo-qr-auth");
 });
 test("QR Google callbacks exchange once and remove codes before opening QR", async () => {

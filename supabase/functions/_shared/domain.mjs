@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { minutesFormat } from "./minutes-formats.mjs";
 
 export const MAX_FILE_SIZE = 24 * 1000 * 1000;
 export const MAX_TEXT_LENGTH = 100_000;
@@ -34,14 +35,18 @@ export const MINUTES_MODELS = ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"];
 
 // Omitted options preserve the saved depth for older clients and error retries;
 // an omitted model means the connection settings' model, as before.
-export const RetrySchema = z.object({
-  template: MetadataSchema.shape.template.removeDefault().optional(),
-  model: z.enum(MINUTES_MODELS).optional(),
-}).strict();
+export const RetrySchema = z
+  .object({
+    template: MetadataSchema.shape.template.removeDefault().optional(),
+    model: z.enum(MINUTES_MODELS).optional(),
+  })
+  .strict();
 
 // Tag names are the persisted identity; there is no separate tag-ID registry.
 export const TagNameSchema = z.string().trim().min(1).max(50);
-export const MeetingTagsSchema = z.array(TagNameSchema).max(50)
+export const MeetingTagsSchema = z
+  .array(TagNameSchema)
+  .max(50)
   .transform((names) => [...new Set(names)]);
 
 export const PatchSchema = z
@@ -49,6 +54,7 @@ export const PatchSchema = z
     title: z.string().trim().min(1).max(160).optional(),
     tags: MeetingTagsSchema.optional(),
     markdown: z.string().max(150_000).optional(),
+    markdownFormat: MetadataSchema.shape.template.removeDefault().optional(),
     transcript: z.string().trim().min(1).max(MAX_TEXT_LENGTH).optional(),
     completedActions: z
       .array(z.number().int().nonnegative())
@@ -58,12 +64,63 @@ export const PatchSchema = z
       .record(z.string().max(100), z.string().trim().min(1).max(100))
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((patch) => patch.markdownFormat === undefined || patch.markdown !== undefined, {
+    message: "編集する本文を指定してください。",
+  });
 
 export function renameMarkdownHeading(markdown, previousTitle, nextTitle) {
   const heading = /^# ([^\r\n]+)(\r?\n|$)/.exec(markdown);
   if (!heading || heading[1] !== previousTitle) return markdown;
   return `# ${nextTitle}${markdown.slice(heading[0].length - heading[2].length)}`;
+}
+
+export function minutesForFormat(minutes, format) {
+  const narrative = minutes?.formats?.[format];
+  return narrative ? { ...minutes, ...narrative } : minutes;
+}
+
+export function minutesDocuments(meeting, minutes) {
+  const markdownByFormat = minutes.formats
+    ? Object.fromEntries(Object.keys(minutes.formats).map((format) => [
+        format,
+        minutesToMarkdown({ ...meeting, template: format }, minutesForFormat(minutes, format)),
+      ]))
+    : null;
+  return {
+    markdown: markdownByFormat?.[meeting.template] ?? minutesToMarkdown(meeting, minutes),
+    markdownByFormat,
+  };
+}
+
+// Browser input may select only one saved view, never replace the whole bundle.
+// Old clients without markdownFormat still edit the meeting's initial view.
+export function minutesMarkdownPatch(meeting, patch) {
+  const { markdownFormat, ...result } = patch;
+  const selected = markdownFormat ?? meeting.template;
+  if (markdownFormat !== undefined &&
+      !Object.hasOwn(meeting.markdownByFormat || {}, markdownFormat)) {
+    throw Object.assign(new Error("Missing minutes format"), {
+      status: 400,
+      publicMessage: "この形式はまだ作成されていません。3形式を再生成してください。",
+    });
+  }
+  if (meeting.markdownByFormat) {
+    const documents = { ...meeting.markdownByFormat };
+    if (patch.title !== undefined) {
+      for (const format of Object.keys(documents)) {
+        documents[format] = renameMarkdownHeading(documents[format], meeting.title, patch.title);
+      }
+    }
+    if (patch.markdown !== undefined) documents[selected] = patch.markdown;
+    if (patch.title !== undefined || patch.markdown !== undefined) {
+      result.markdownByFormat = documents;
+      result.markdown = documents[meeting.template];
+    }
+  } else if (patch.title !== undefined && patch.markdown === undefined) {
+    result.markdown = renameMarkdownHeading(meeting.markdown, meeting.title, patch.title);
+  }
+  return result;
 }
 
 export function timecode(seconds) {
@@ -94,47 +151,71 @@ export function minutesToMarkdown(meeting, minutes) {
     `日時：${meeting.date}`,
     `参加者：${meeting.participants || "未記入"}`,
     "",
-    "## サマリー",
+    `議事録形式：${minutesFormat(meeting.template).label}`,
+    "",
+    "## 内容要旨",
     "",
     minutes.summary,
   ];
-  for (const topic of minutes.topics) {
+  if (minutes.decisions.length) {
     lines.push(
       "",
-      `## ${topic.title}`,
+      "## 決定事項",
+      "",
+      ...minutes.decisions.map((d) => `- ${d}`),
+    );
+  }
+  const nextMeetings = minutes.topics.filter(
+    (topic) => topic.title.trim() === "次回会議",
+  );
+  const topics = minutes.topics.filter(
+    (topic) => topic.title.trim() !== "次回会議",
+  );
+  if (topics.length) lines.push("", "## 議事内容");
+  for (const topic of topics) {
+    lines.push(
+      "",
+      `### ${topic.title}`,
       "",
       ...topic.points.map((p) => `- ${p}`),
     );
   }
-  lines.push(
-    "",
-    "## 決定事項",
-    "",
-    ...(minutes.decisions.length
-      ? minutes.decisions.map((d) => `- ${d}`)
-      : ["決定事項の記録はありません。"]),
-  );
-  lines.push(
-    "",
-    "## アクションアイテム",
-    "",
-    ...(minutes.actions.length
-      ? minutes.actions.map(
-          (a) =>
-            `- [ ] ${a.task}（担当：${a.owner || "未定"} / 期限：${
-              a.due || "未定"
-            }）`,
-        )
-      : ["アクションの記録はありません。"]),
-  );
-  lines.push(
-    "",
-    "## 継続検討・確認事項",
-    "",
-    ...(minutes.openQuestions.length
-      ? minutes.openQuestions.map((q) => `- ${q}`)
-      : ["確認事項の記録はありません。"]),
-  );
+  if (minutes.actions.length) {
+    const cell = (value) =>
+      value
+        .replace(/\\/g, "\\\\")
+        .replace(/\|/g, "\\|")
+        .replace(/[\r\n]+/g, " ");
+    lines.push(
+      "",
+      "## 次の対応",
+      "",
+      "| 対応内容 | 担当 | 期限・時期 |",
+      "| --- | --- | --- |",
+      ...minutes.actions.map(
+        (a) =>
+          `| ${cell(a.task)} | ${cell(a.owner || "未定")} | ${cell(a.due || "未定")} |`,
+      ),
+    );
+  }
+  if (minutes.openQuestions.length) {
+    lines.push(
+      "",
+      "## 継続検討・確認事項",
+      "",
+      ...minutes.openQuestions.map((q) => `- ${q}`),
+    );
+  }
+  if (nextMeetings.length) {
+    lines.push(
+      "",
+      "## 次回会議",
+      "",
+      ...nextMeetings.flatMap((topic) =>
+        topic.points.map((point) => `- ${point}`),
+      ),
+    );
+  }
   if (minutes.documentReview?.length) {
     lines.push("", "## 添付資料との照合", "");
     for (const review of minutes.documentReview) {

@@ -38,6 +38,10 @@ import {
   type Meeting,
 } from "./types";
 import { Modal } from "./Modal";
+import { MinutesFormatField } from "./MinutesFormatField";
+import { MinutesMarkdown as Markdown } from "./MinutesMarkdown.mjs";
+import { MINUTES_FORMATS, minutesFormat } from "../supabase/functions/_shared/minutes-formats.mjs";
+import { minutesView } from "./minutes-views.mjs";
 import { AttachmentPanel } from "./Attachments";
 import { MeetingSchedule } from "./Calendar";
 import {
@@ -55,55 +59,6 @@ const tabLabels: Record<Tab, string> = {
 };
 const hasFiles = (event: { dataTransfer: DataTransfer }) =>
   event.dataTransfer.types.includes("Files");
-
-function Markdown({ content, title }: { content: string; title: string }) {
-  return (
-    <div className="markdown">
-      {content.split("\n").map((line, i, lines) => {
-        // The page heading already shows the title, date and participants;
-        // keep the generated header lines for print only.
-        const header =
-          lines[0] === `# ${title}` &&
-          i < 4 &&
-          (i === 0 || /^(日時|参加者)：/.test(line));
-        if (header && i === 0)
-          return (
-            <h1 key={i} className="print-only">
-              {line.slice(2)}
-            </h1>
-          );
-        if (header)
-          return (
-            <p key={i} className="print-only">
-              {line}
-            </p>
-          );
-        if (line.startsWith("# ")) return <h1 key={i}>{line.slice(2)}</h1>;
-        if (line.startsWith("## ")) return <h2 key={i}>{line.slice(3)}</h2>;
-        if (line.startsWith("### ")) return <h3 key={i}>{line.slice(4)}</h3>;
-        if (/^- \[[ x]\] /.test(line))
-          return (
-            <p className="md-list" key={i}>
-              <span>{line.startsWith("- [x]") ? "☑" : "☐"}</span>
-              {line.slice(6)}
-            </p>
-          );
-        if (line.startsWith("- "))
-          return (
-            <p className="md-list" key={i}>
-              <span>•</span>
-              {line.slice(2)}
-            </p>
-          );
-        return line.trim() ? (
-          <p key={i}>{line}</p>
-        ) : (
-          <div className="md-space" key={i} />
-        );
-      })}
-    </div>
-  );
-}
 
 export function ActionList({
   meeting,
@@ -250,6 +205,10 @@ export function MeetingDetail({
       (id): id is string => !!id && minutesModels.includes(id),
     ) || "gpt-6-astra";
   const [retryModel, setRetryModel] = useState(meetingModel);
+  const [viewFormat, setViewFormat] = useState<Meeting["template"]>(m.template);
+  const view = minutesView(m, viewFormat);
+  const hasAllFormats = view.available.length === MINUTES_FORMATS.length;
+  useEffect(() => { setViewFormat(m.template); }, [m.id]);
   const audio = useRef<HTMLAudioElement>(null);
   const [audioSource, setAudioSource] = useState("");
   const [audioPart, setAudioPart] = useState(0);
@@ -308,7 +267,7 @@ export function MeetingDetail({
     return () => window.removeEventListener("beforeunload", prevent);
   }, [editing]);
   function beginEdit() {
-    setDraft(tab === "minutes" ? m.markdown : m.transcript);
+    setDraft(tab === "minutes" ? view.markdown : m.transcript);
     setEditing(true);
   }
   async function save() {
@@ -318,7 +277,10 @@ export function MeetingDetail({
         await api<Meeting>(`/meetings/${m.id}`, {
           method: "PATCH",
           body: JSON.stringify(
-            tab === "minutes" ? { markdown: draft } : { transcript: draft },
+            tab === "minutes" ? {
+              markdown: draft,
+              ...(view.available.length ? { markdownFormat: view.format } : {}),
+            } : { transcript: draft },
           ),
         }),
       );
@@ -342,6 +304,7 @@ export function MeetingDetail({
               : undefined,
         }),
       );
+      if (confirm === "regenerate") setViewFormat(retryTemplate);
       setConfirm(null);
     } catch (e) {
       notify((e as Error).message);
@@ -390,7 +353,7 @@ export function MeetingDetail({
     }
   }
   
-  const displayText = tab === "transcript" ? m.transcript : m.markdown;
+  const displayText = tab === "transcript" ? m.transcript : view.markdown;
   const turns = m.segments.length ? null : speakerTurns(m.transcript);
   const tabs: Tab[] = m.isDemo
     ? ["minutes", "transcript", "actions", "files"]
@@ -423,6 +386,19 @@ export function MeetingDetail({
     event.preventDefault();
     setTab(next);
     document.getElementById(`meeting-tab-${next}`)?.focus();
+  }
+  function onFormatKey(event: KeyboardEvent<HTMLDivElement>) {
+    if (editing || busy) return;
+    const available = view.available;
+    const index = available.indexOf(view.format);
+    const next = event.key === "ArrowRight" ? available[(index + 1) % available.length]
+      : event.key === "ArrowLeft" ? available[(index - 1 + available.length) % available.length]
+      : event.key === "Home" ? available[0]
+      : event.key === "End" ? available.at(-1) : undefined;
+    if (!next) return;
+    event.preventDefault();
+    setViewFormat(next as Meeting["template"]);
+    document.getElementById(`minutes-format-${next}`)?.focus();
   }
   return (
     <div
@@ -472,8 +448,8 @@ export function MeetingDetail({
               {(
                 [
                   [
-                    "議事録（Markdown）",
-                    () => download(`${m.title}.md`, m.markdown),
+                    `議事録・${view.label}（Markdown）`,
+                    () => download(`${m.title}_${view.label}.md`, view.markdown),
                   ],
                   [
                     "文字起こし（テキスト）",
@@ -498,12 +474,12 @@ export function MeetingDetail({
                         true,
                       ] as const,
                   ),
-                  ["印刷・PDFに保存", () => window.print()],
+                  [`印刷・PDFに保存（${view.label}）`, () => { setTab("minutes"); requestAnimationFrame(() => window.print()); }],
                 ] as (readonly [string, () => void, boolean?])[]
               ).map(([label, run, audioItem]) => (
                 <button
                   key={label}
-                  disabled={audioItem && !!audioSaving}
+                  disabled={audioItem ? !!audioSaving : editing || busy}
                   onClick={(e) => {
                     run();
                     e.currentTarget.closest("details")?.removeAttribute("open");
@@ -596,14 +572,14 @@ export function MeetingDetail({
                   : "次の録音を送信するまで待機しています"
                 : m.status === "transcribing"
                   ? `録音を文字起こししています${recordings.length > 1 ? `（${recordings.filter((part) => part.transcribed).length}/${recordings.length} 完了）` : ""}`
-                  : "会話を解析して議事録を作成しています"}
+                  : "会話を解析して3形式の議事録を作成しています"}
             </strong>
             <p>
               {wait
                 ? `${waitSeconds > 0 ? `自動再開まで約${waitLabel}。` : "順番を確認し、自動再開しています。"} ${recordings.filter((part) => part.transcribed).length}/${recordings.length} 完了。${wait.reason === "rate_limit" && wait.attempt ? ` 自動再試行 ${wait.attempt}/5。` : ""}`
                 : m.status === "transcribing"
                   ? `${transcriptionModelName(m.transcriptionModel)}が音声を読み取っています。`
-                  : `${modelName(m.minutesModel)}が議題・決定事項・アクションを整理しています。`}{" "}
+                  : `${modelName(m.minutesModel)}が要約・標準・詳細をまとめて作成しています。`}{" "}
               完了分は保存されます。アプリを閉じても、残りの処理はサーバーで自動的に続きます。
             </p>
           </div>
@@ -725,7 +701,7 @@ export function MeetingDetail({
                 <div className="editor-wrap">
                   <p>
                     {tab === "minutes"
-                      ? "見出しは「## 」、箇条書きは「- 」で記入できます。「保存」で全員に共有します。カレンダー・AI抽出の要点・決定事項・アクションは別管理のため、本文の変更は自動反映しません。再生成すると編集した本文は上書きされます。"
+                      ? `現在の${view.label}だけを編集します。見出しは「## 」、箇条書きは「- 」で記入できます。「保存」で全員に共有します。他形式の本文・カレンダー・AI抽出の要点・決定事項・アクションには自動反映しません。再生成すると3形式の本文が上書きされます。`
                       : "文字起こしの修正後、議事録を再生成できます。"}
                   </p>
                   <textarea
@@ -739,8 +715,35 @@ export function MeetingDetail({
                   />
                 </div>
               ) : tab === "minutes" ? (
-                m.markdown ? (
-                  <Markdown content={m.markdown} title={m.title} />
+                <>
+                  {(view.markdown || hasAllFormats) && (
+                    <div className="minutes-format-switcher">
+                      <div className="minutes-format-tabs" role="tablist" aria-label="議事録の形式" onKeyDown={onFormatKey}>
+                        {MINUTES_FORMATS.map((format) => {
+                          const available = view.available.includes(format.id) || (!view.available.length && format.id === view.format);
+                          return <button
+                            key={format.id}
+                            id={`minutes-format-${format.id}`}
+                            role="tab"
+                            aria-selected={view.format === format.id}
+                            aria-controls={`minutes-view-${format.id}`}
+                            tabIndex={view.format === format.id ? 0 : -1}
+                            disabled={!available || busy}
+                            className={view.format === format.id ? "active" : ""}
+                            onClick={() => setViewFormat(format.id as Meeting["template"])}
+                          >{format.id === "detailed" ? "詳細版" : format.label}</button>;
+                        })}
+                      </div>
+                      <p className="minutes-format-note">
+                        {hasAllFormats
+                          ? "3形式を保存済みです。切り替え時の追加AI課金はありません。"
+                          : "以前に作成した会議録です。「3形式を作成」から再生成すると、すべての形式を表示できます（AI使用料がかかります）。"}
+                      </p>
+                    </div>
+                  )}
+                  <div role="tabpanel" id={`minutes-view-${view.format}`} aria-labelledby={view.markdown || hasAllFormats ? `minutes-format-${view.format}` : undefined}>
+                {view.markdown ? (
+                  <Markdown content={view.markdown} title={m.title} />
                 ) : (
                   <div className="document-empty">
                     <FileText size={36} />
@@ -749,9 +752,11 @@ export function MeetingDetail({
                         ? "議事録を準備しています"
                         : "議事録はまだありません"}
                     </h3>
-                    <p>解析が完了すると、ここに議事録が表示されます。</p>
+                    <p>解析が完了すると、要約・標準・詳細をタブで切り替えられます。</p>
                   </div>
-                )
+                )}
+                  </div>
+                </>
               ) : tab === "transcript" ? (
                 <div className="transcript-content">
                   {m.hasAudio && (
@@ -926,7 +931,7 @@ export function MeetingDetail({
               会議のポイント<span>AI抽出</span>
             </h3>
             <p>
-              {m.minutes?.summary ||
+              {view.summary ||
                 "解析後に、会議の要点がここにまとまります。"}
             </p>
           </section>
@@ -992,8 +997,8 @@ export function MeetingDetail({
           </div>
           <div className="rail-models">
             <p>
-              <span>議事録の詳しさ（解析設定）</span>
-              {{ standard: "標準", brief: "要点を簡潔に", detailed: "背景も詳しく" }[m.template]}
+              <span>議事録の形式</span>
+              {hasAllFormats ? "要約・標準・詳細を作成済み" : minutesFormat(m.template).label}
             </p>
             <p>
               <span>解析モデル</span>
@@ -1027,7 +1032,7 @@ export function MeetingDetail({
                 }}
               >
                 <RefreshCw size={13} />
-                モデル・詳しさを変えて再生成
+                {hasAllFormats ? "3形式を再生成" : "3形式を作成"}
               </button>
             )}
             <button
@@ -1072,19 +1077,7 @@ export function MeetingDetail({
                 </select>
                 <small>この会議の再生成だけに使います。接続設定のモデルは変わりません。料金は選んだモデルの単価で記録します。</small>
               </label>
-              <label className="field">
-                議事録の詳しさ
-                <select
-                  value={retryTemplate}
-                  onChange={(event) => setRetryTemplate(event.target.value as Meeting["template"])}
-                  disabled={busy}
-                >
-                  <option value="standard">標準</option>
-                  <option value="brief">要点を簡潔に</option>
-                  <option value="detailed">背景も詳しく</option>
-                </select>
-                <small>詳しくする場合も、会話に含まれる背景・理由・異論を整理します。会話にない内容は補いません。</small>
-              </label>
+              <MinutesFormatField value={retryTemplate} onChange={setRetryTemplate} disabled={busy} />
             </div>
           )}
           <p className="confirm-copy">
@@ -1092,7 +1085,7 @@ export function MeetingDetail({
               ? m.status === "uploading"
                 ? "取り込み途中の会議を一覧から取り除きます。クラウドに送信済みの未完了音声は完全に削除され、元に戻せません。元の録音ファイルから再度取り込めます。"
                 : "会議と音声を一覧から取り除き、アプリの保存先にあるゴミ箱へ移動します。"
-              : "選んだ解析モデルと詳しさで再解析します。保存済みの文字起こしは再利用し、未完了の音声がある場合のみ接続設定の文字起こしモデルで文字起こしを行います。添付資料は解析に使いません。編集した議事録本文とアクションの完了状態は上書きされます。カレンダーの手動変更と既存のタグは保持します。"}
+              : "選んだ解析モデルで、要約・標準・詳細を1回のAI応答でまとめて作成します（AI使用料がかかります）。保存済みの文字起こしは再利用し、未完了の音声がある場合のみ接続設定の文字起こしモデルで文字起こしを行います。添付資料は解析に使いません。3形式すべての編集済み本文とアクションの完了状態は上書きされます。カレンダーの手動変更と既存のタグは保持します。"}
           </p>
           <div className="modal-footer">
             <button

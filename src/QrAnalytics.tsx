@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { useQrApi, type QrAnalyticsData } from "./qr-api";
-import { chartGeometry } from "./qr-chart.mjs";
+import { chartGeometry, hourlyGeometry } from "./qr-chart.mjs";
 import { sourceLabels, deviceLabels, browserLabels } from "./qr-labels.mjs";
+import {
+  browserReferenceCount,
+  formatBrowserReference,
+} from "./qr-analytics-presentation.mjs";
 
 function Breakdown({
   title,
@@ -10,12 +14,14 @@ function Breakdown({
   labels,
   total,
   view,
+  showReference,
 }: {
   title: string;
   entries: { key: string; count: number; uniqueCount: number }[];
   labels: Record<string, string>;
   total: number;
   view: "chart" | "table";
+  showReference: boolean;
 }) {
   return (
     <section className="qr-breakdown">
@@ -34,10 +40,13 @@ function Breakdown({
                     （{total ? ((entry.count / total) * 100).toFixed(1) : "0.0"}
                     %）
                   </small>
-                  <small>
-                    {" "}
-                    ／ ユニーク {entry.uniqueCount.toLocaleString()}件
-                  </small>
+                  {showReference && (
+                    <small className="qr-breakdown-reference">
+                      {" "}
+                      ／ ブラウザー参考値{" "}
+                      {formatBrowserReference(entry.uniqueCount, entry.count)}
+                    </small>
+                  )}
                 </strong>
               </div>
               <div className="qr-bar-track" aria-hidden="true">
@@ -62,9 +71,9 @@ function Breakdown({
             <thead>
               <tr>
                 <th scope="col">分類</th>
-                <th scope="col">回数</th>
-                <th scope="col">ユニーク</th>
-                <th scope="col">割合</th>
+                <th scope="col">延べアクセス</th>
+                {showReference && <th scope="col">ブラウザー参考値</th>}
+                <th scope="col">延べ回数の割合</th>
               </tr>
             </thead>
             <tbody>
@@ -72,7 +81,11 @@ function Breakdown({
                 <tr key={entry.key}>
                   <th scope="row">{labels[entry.key] ?? entry.key}</th>
                   <td>{entry.count.toLocaleString()}回</td>
-                  <td>{entry.uniqueCount.toLocaleString()}件</td>
+                  {showReference && (
+                    <td>
+                      {formatBrowserReference(entry.uniqueCount, entry.count)}
+                    </td>
+                  )}
                   <td>
                     {total ? ((entry.count / total) * 100).toFixed(1) : "0.0"}%
                   </td>
@@ -87,6 +100,202 @@ function Breakdown({
 }
 
 const shortDate = (date: string) => date.slice(5).replace("-", "/");
+const hourRange = (hour: number) => `${hour}時台（${hour}:00〜${hour}:59）`;
+function HourlyChart({
+  hourly,
+  metric,
+  days,
+  view,
+  showReference,
+}: {
+  hourly: { hour: number; count: number; uniqueCount: number }[];
+  metric: "accesses" | "unique";
+  days: number;
+  view: "chart" | "table";
+  showReference: boolean;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const unit = metric === "unique" ? "件" : "回";
+  const metricLabel =
+    metric === "unique" ? "ブラウザー参考値" : "延べアクセス数";
+  const chart = hourlyGeometry(
+    hourly.map((h) => ({
+      hour: h.hour,
+      count:
+        metric === "unique"
+          ? browserReferenceCount(h.uniqueCount, h.count)
+          : h.count,
+    })),
+  );
+  const shown = hover ?? chart.peakHour;
+  const shownBar = shown === null ? null : chart.bars[shown];
+  const valueText = (count: number | null) =>
+    count === null ? "未計測・対象外" : `${count.toLocaleString()}${unit}`;
+  return (
+    <section className="qr-hourly" aria-label="時間帯別アクセス">
+      <h3>時間帯別（日本時間）</h3>
+      <p className="qr-analysis-meta">
+        直近{days}日のアクセスを、開かれた時刻の「時」ごとに合計しています。
+      </p>
+      {view === "chart" ? (
+        <>
+          <div className="qr-chart-scroll">
+            <svg
+              viewBox={`0 0 ${chart.width} ${chart.height}`}
+              className="qr-trend-chart qr-hourly-chart"
+              role="group"
+              aria-label={`時間帯別の${metricLabel}。各棒を選ぶと時間帯の値を確認できます。`}
+            >
+              {chart.ticks.map((tick) => (
+                <g key={tick.value} aria-hidden="true">
+                  <line
+                    x1={chart.left}
+                    x2={chart.width - chart.right}
+                    y1={tick.y}
+                    y2={tick.y}
+                    className="qr-chart-grid"
+                  />
+                  <text x={chart.left - 10} y={tick.y + 5} textAnchor="end">
+                    {tick.value.toLocaleString()}
+                  </text>
+                </g>
+              ))}
+              <text x={chart.left} y={22} aria-hidden="true">
+                {metricLabel}（{unit}）
+              </text>
+              {chart.bars.map((bar) => (
+                <g key={bar.hour}>
+                  <rect
+                    x={bar.x - 2}
+                    y={chart.top}
+                    width={bar.width + 4}
+                    height={chart.height - chart.top - chart.bottom}
+                    className="qr-hourly-hit"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`${hourRange(bar.hour)}：${valueText(bar.count)}`}
+                    onMouseEnter={() => setHover(bar.hour)}
+                    onFocus={() => setHover(bar.hour)}
+                    onClick={() => setHover(bar.hour)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setHover(bar.hour);
+                      }
+                    }}
+                  >
+                    <title>{`${hourRange(bar.hour)}：${valueText(bar.count)}`}</title>
+                  </rect>
+                  <rect
+                    x={bar.x}
+                    y={bar.y}
+                    width={bar.width}
+                    height={bar.height}
+                    rx={2}
+                    className={
+                      shown === bar.hour
+                        ? "qr-hourly-bar qr-hourly-bar-active"
+                        : "qr-hourly-bar"
+                    }
+                    aria-hidden="true"
+                  />
+                  {bar.hour % 3 === 0 && (
+                    <text
+                      x={bar.center}
+                      y={chart.height - 18}
+                      textAnchor="middle"
+                      aria-hidden="true"
+                    >
+                      {bar.hour}
+                    </text>
+                  )}
+                </g>
+              ))}
+              <text
+                x={chart.width - chart.right}
+                y={chart.height - 2}
+                textAnchor="end"
+                aria-hidden="true"
+              >
+                時
+              </text>
+            </svg>
+          </div>
+          <p className="qr-chart-readout" role="status">
+            {shownBar
+              ? `${hourRange(shownBar.hour)}：${metricLabel} ${valueText(shownBar.count)}`
+              : "この期間のアクセスはまだありません。"}
+            <span>
+              {hover === null && shownBar
+                ? "いちばん多い時間帯を表示しています。棒に触れるか選択すると、その時間帯の値を確認できます。"
+                : "棒に触れるか選択すると、その時間帯の値を確認できます。"}
+            </span>
+          </p>
+        </>
+      ) : (
+        <div
+          className="qr-table-scroll"
+          tabIndex={0}
+          role="region"
+          aria-label="時間帯別アクセス数の表"
+        >
+          <table className="qr-data-table">
+            <caption>時間帯別アクセス数（日本時間・直近{days}日）</caption>
+            <thead>
+              <tr>
+                <th scope="col">時間帯</th>
+                <th scope="col">延べアクセス</th>
+                {showReference && (
+                  <th scope="col">ブラウザー参考値</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {chart.bars.map((bar) => {
+                const row = hourly.find((h) => h.hour === bar.hour);
+                return (
+                  <tr key={bar.hour}>
+                    <th scope="row">{hourRange(bar.hour)}</th>
+                    <td>{(row?.count ?? 0).toLocaleString()}回</td>
+                    {showReference && (
+                      <td>
+                        {formatBrowserReference(
+                          row?.uniqueCount ?? 0,
+                          row?.count ?? 0,
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+function ReferenceValue({
+  unique,
+  accesses,
+}: {
+  unique: number;
+  accesses: number;
+}) {
+  const count = browserReferenceCount(unique, accesses);
+  return (
+    <strong className={count === null ? "qr-reference-unavailable" : undefined}>
+      {count === null ? (
+        "未計測・対象外"
+      ) : (
+        <>
+          {count.toLocaleString()}
+          <small>件</small>
+        </>
+      )}
+    </strong>
+  );
+}
 export function QrAnalytics({
   linkId,
   refreshKey,
@@ -99,6 +308,7 @@ export function QrAnalytics({
   const [source, setSource] = useState("all");
   const [view, setView] = useState<"chart" | "table">("chart");
   const [metric, setMetric] = useState<"accesses" | "unique">("accesses");
+  const [showReference, setShowReference] = useState(false);
   const [data, setData] = useState<QrAnalyticsData | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -164,16 +374,31 @@ export function QrAnalytics({
   const chart = chartGeometry(
     (current?.daily ?? []).map((day) => ({
       date: day.date,
-      count: metric === "unique" ? day.uniqueCount : day.count,
+      count:
+        metric === "unique"
+          ? browserReferenceCount(day.uniqueCount, day.count)
+          : day.count,
     })),
   );
-  const metricLabel = metric === "unique" ? "ユニーク数" : "延べアクセス数";
+  const metricLabel =
+    metric === "unique" ? "ブラウザー参考値" : "延べアクセス数";
   const unit = metric === "unique" ? "件" : "回";
   const active =
     current?.daily.find((day) => day.date === highlight) ??
     current?.daily.at(-1);
   const today = current?.daily.at(-1)?.count ?? 0;
   const todayUnique = current?.daily.at(-1)?.uniqueCount ?? 0;
+  const activeValue =
+    metric === "unique"
+      ? formatBrowserReference(active?.uniqueCount ?? 0, active?.count ?? 0)
+      : `${(active?.count ?? 0).toLocaleString()}回`;
+  const periodValue =
+    metric === "unique"
+      ? formatBrowserReference(
+          current?.periodUnique ?? 0,
+          current?.periodTotal ?? 0,
+        )
+      : `${(current?.periodTotal ?? 0).toLocaleString()}回`;
   return (
     <section className="qr-analytics" aria-label="アクセス分析">
       <div className="qr-analytics-heading">
@@ -183,7 +408,7 @@ export function QrAnalytics({
             アクセス分析
           </h2>
           <p>
-            延べアクセス数と、ブラウザー単位のユニーク数。日本時間で集計します。
+            QRやリンクが開かれた延べ回数を主指標として表示します。日本時間で集計します。
           </p>
         </div>
         <button
@@ -231,7 +456,7 @@ export function QrAnalytics({
             表
           </button>
         </div>
-        {view === "chart" && (
+        {view === "chart" && showReference && (
           <div
             className="qr-segmented"
             role="group"
@@ -247,7 +472,7 @@ export function QrAnalytics({
               aria-pressed={metric === "unique"}
               onClick={() => setMetric("unique")}
             >
-              ユニーク
+              ブラウザー参考値
             </button>
           </div>
         )}
@@ -290,39 +515,58 @@ export function QrAnalytics({
                 <small>回</small>
               </strong>
             </div>
-            <div>
-              <span>累計・ユニーク{source !== "all" && "（選択経路）"}</span>
-              <strong>
-                {current.totalUnique.toLocaleString()}
-                <small>件</small>
-              </strong>
-            </div>
-            <div>
-              <span>直近{days}日・ユニーク</span>
-              <strong>
-                {current.periodUnique.toLocaleString()}
-                <small>件</small>
-              </strong>
-            </div>
-            <div>
-              <span>今日・ユニーク</span>
-              <strong>
-                {todayUnique.toLocaleString()}
-                <small>件</small>
-              </strong>
-            </div>
           </div>
-          <p className="qr-unique-note">
-            ユニークは、このQR内で同じブラウザーを期間内に1件として数えた目安で、人数ではありません。
-            対応後に匿名IDを取得できたアクセスのみが対象です。別端末・別ブラウザー・シークレットモード・保存データの削除・IDの180日期限後は別件になります。
-            日別や内訳のユニーク数には重複があるため、足しても期間全体のユニーク数にはなりません。
-            <br />
-            選択期間：ID取得済み {current.identifiedAccesses.toLocaleString()}回
-            ／ 判別不能（旧履歴・保存不可など）
-            {current.unknownAccesses.toLocaleString()}回 ／ 推定ボット{" "}
-            {current.botAccesses.toLocaleString()}回。
-            判別不能・推定ボットは延べアクセスに含み、ユニークには含めません。ボット判定は完全ではありません。
+          <p className="qr-measurement-warning">
+            <strong>人数・端末数は計測していません。</strong>
+            同じスマホでも、コードスキャナーやアプリ内ブラウザーが匿名IDを引き継がないと別件になります。ブラウザー単位の数値は参考値です。
           </p>
+          <details
+            className="qr-browser-reference"
+            open={showReference}
+            onToggle={(event) => {
+              const open = event.currentTarget.open;
+              setShowReference(open);
+              if (!open) setMetric("accesses");
+            }}
+          >
+            <summary>ブラウザー単位の参考値を見る</summary>
+            <p className="qr-analysis-meta">
+              同じQRの同じ匿名IDを期間内に1件として数えます。実人数・スマホの台数ではなく、利用者数の比較や来店人数の判断には使えません。
+            </p>
+            <div className="qr-analysis-kpis qr-reference-kpis">
+              <div>
+                <span>
+                  累計・ブラウザー参考値{source !== "all" && "（選択経路）"}
+                </span>
+                <ReferenceValue
+                  unique={current.totalUnique}
+                  accesses={current.total}
+                />
+              </div>
+              <div>
+                <span>直近{days}日・ブラウザー参考値</span>
+                <ReferenceValue
+                  unique={current.periodUnique}
+                  accesses={current.periodTotal}
+                />
+              </div>
+              <div>
+                <span>今日・ブラウザー参考値</span>
+                <ReferenceValue unique={todayUnique} accesses={today} />
+              </div>
+            </div>
+            <p className="qr-unique-note">
+              選択期間：匿名ID取得済み{" "}
+              {current.identifiedAccesses.toLocaleString()}回 ／
+              匿名ID未取得（旧履歴・保存不可など）
+              {current.unknownAccesses.toLocaleString()}回 ／ 推定ボット{" "}
+              {current.botAccesses.toLocaleString()}回。
+              <br />
+              匿名ID未取得・推定ボットは延べアクセスには含み、参考値からは除外します。アクセスがあるのにIDを取得できていない場合は「未計測・対象外」と表示し、0件と区別します。過去の参考値は復元できません。
+              <br />
+              別ブラウザー・シークレットモード・保存データの削除・IDの180日期限後も別件になります。日別や内訳の参考値には重複があるため、足しても期間全体の参考値にはなりません。ボット判定は完全ではありません。
+            </p>
+          </details>
           <p className="qr-analysis-meta">
             {current.startDate} 〜 {current.endDate} ・経路：
             {sourceLabels[source]} ・表示中は約10秒ごとに自動更新
@@ -341,7 +585,7 @@ export function QrAnalytics({
                   viewBox={`0 0 ${chart.width} ${chart.height}`}
                   className="qr-trend-chart"
                   role="group"
-                  aria-label={`直近${days}日の${metricLabel}推移。期間全体${metric === "unique" ? current.periodUnique : current.periodTotal}${unit}。各点を選ぶと日別の値を確認できます。`}
+                  aria-label={`直近${days}日の${metricLabel}推移。期間全体${periodValue}。各点を選ぶと日別の値を確認できます。`}
                 >
                   {chart.ticks.map((tick) => (
                     <g key={tick.value} aria-hidden="true">
@@ -360,37 +604,41 @@ export function QrAnalytics({
                   <text x={chart.left} y={15} aria-hidden="true">
                     {metricLabel}（{unit}）
                   </text>
-                  <polyline
-                    points={chart.polyline}
-                    className="qr-chart-line"
-                    aria-hidden="true"
-                  />
-                  {chart.points.map((point) => (
-                    <circle
-                      key={point.date}
-                      cx={point.x}
-                      cy={point.y}
-                      r={active?.date === point.date ? 6 : 4}
-                      className="qr-chart-point"
-                      tabIndex={0}
-                      role="button"
-                      aria-label={`${point.date}：${point.count}${unit}`}
-                      onMouseEnter={() => setHighlight(point.date)}
-                      onFocus={() => setHighlight(point.date)}
-                      onClick={() => setHighlight(point.date)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setHighlight(point.date);
-                        }
-                      }}
-                    >
-                      <title>
-                        {point.date}：{point.count.toLocaleString()}
-                        {unit}
-                      </title>
-                    </circle>
+                  {chart.polylines.map((points, index) => (
+                    <polyline
+                      key={index}
+                      points={points}
+                      className="qr-chart-line"
+                      aria-hidden="true"
+                    />
                   ))}
+                  {chart.points.map((point) =>
+                    point.y === null || point.count === null ? null : (
+                      <circle
+                        key={point.date}
+                        cx={point.x}
+                        cy={point.y}
+                        r={active?.date === point.date ? 6 : 4}
+                        className="qr-chart-point"
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`${point.date}：${point.count}${unit}`}
+                        onMouseEnter={() => setHighlight(point.date)}
+                        onFocus={() => setHighlight(point.date)}
+                        onClick={() => setHighlight(point.date)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setHighlight(point.date);
+                          }
+                        }}
+                      >
+                        <title>
+                          {`${point.date}：${point.count.toLocaleString()}${unit}`}
+                        </title>
+                      </circle>
+                    ),
+                  )}
                   {chart.labelIndexes.map((index) => (
                     <text
                       key={index}
@@ -405,14 +653,15 @@ export function QrAnalytics({
                 </svg>
               </div>
               <p className="qr-chart-readout" role="status">
-                {active?.date}：{metricLabel}{" "}
-                {(
-                  (metric === "unique" ? active?.uniqueCount : active?.count) ??
-                  0
-                ).toLocaleString()}
-                {unit}
+                {active?.date}：{metricLabel} {activeValue}
                 <span>点に触れるか選択すると、日別の値を確認できます。</span>
               </p>
+              {metric === "unique" &&
+                chart.points.some((point) => point.count === null) && (
+                  <p className="qr-analysis-meta">
+                    未計測・対象外の日は点と線を表示せず、0件の日と区別しています。
+                  </p>
+                )}
               {current.periodTotal === 0 && (
                 <p className="qr-analysis-meta">
                   この期間のアクセスはまだありません。0回の日も表示しています。
@@ -431,10 +680,14 @@ export function QrAnalytics({
                 <thead>
                   <tr>
                     <th scope="col">日付</th>
-                    <th scope="col">アクセス数</th>
-                    <th scope="col">ユニーク</th>
-                    <th scope="col">判別不能</th>
-                    <th scope="col">推定ボット</th>
+                    <th scope="col">延べアクセス</th>
+                    {showReference && (
+                      <>
+                        <th scope="col">ブラウザー参考値</th>
+                        <th scope="col">匿名ID未取得</th>
+                        <th scope="col">推定ボット</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -442,9 +695,15 @@ export function QrAnalytics({
                     <tr key={day.date}>
                       <th scope="row">{day.date}</th>
                       <td>{day.count.toLocaleString()}回</td>
-                      <td>{day.uniqueCount.toLocaleString()}件</td>
-                      <td>{day.unknownCount.toLocaleString()}回</td>
-                      <td>{day.botCount.toLocaleString()}回</td>
+                      {showReference && (
+                        <>
+                          <td>
+                            {formatBrowserReference(day.uniqueCount, day.count)}
+                          </td>
+                          <td>{day.unknownCount.toLocaleString()}回</td>
+                          <td>{day.botCount.toLocaleString()}回</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -452,13 +711,31 @@ export function QrAnalytics({
                   <tr>
                     <th scope="row">期間合計</th>
                     <td>{current.periodTotal.toLocaleString()}回</td>
-                    <td>{current.periodUnique.toLocaleString()}件</td>
-                    <td>{current.unknownAccesses.toLocaleString()}回</td>
-                    <td>{current.botAccesses.toLocaleString()}回</td>
+                    {showReference && (
+                      <>
+                        <td>
+                          {formatBrowserReference(
+                            current.periodUnique,
+                            current.periodTotal,
+                          )}
+                        </td>
+                        <td>{current.unknownAccesses.toLocaleString()}回</td>
+                        <td>{current.botAccesses.toLocaleString()}回</td>
+                      </>
+                    )}
                   </tr>
                 </tfoot>
               </table>
             </div>
+          )}
+          {current.hourly && (
+            <HourlyChart
+              hourly={current.hourly}
+              metric={metric}
+              days={days}
+              view={view}
+              showReference={showReference}
+            />
           )}
           <div className="qr-breakdown-grid">
             <Breakdown
@@ -467,6 +744,7 @@ export function QrAnalytics({
               labels={sourceLabels}
               total={current.periodTotal}
               view={view}
+              showReference={showReference}
             />
             <Breakdown
               title="端末別（推定）"
@@ -474,6 +752,7 @@ export function QrAnalytics({
               labels={deviceLabels}
               total={current.periodTotal}
               view={view}
+              showReference={showReference}
             />
             <Breakdown
               title="ブラウザー別（推定）"
@@ -481,6 +760,7 @@ export function QrAnalytics({
               labels={browserLabels}
               total={current.periodTotal}
               view={view}
+              showReference={showReference}
             />
             <Breakdown
               title="流入元サイト別"
@@ -491,6 +771,7 @@ export function QrAnalytics({
               }}
               total={current.periodTotal}
               view={view}
+              showReference={showReference}
             />
           </div>
           <p className="qr-analysis-meta">

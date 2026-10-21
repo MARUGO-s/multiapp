@@ -2,7 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? "/multiapp/" : "/",
+  // Pages supplies its actual base: custom domains use /, project sites /<repo>/.
+  base: mode === "production" ? process.env.VITE_BASE_PATH || "/" : "/",
   plugins: [react()],
   // The audio worker lazy-loads the AC-3 decoder, which needs code splitting.
   worker: { format: "es" },

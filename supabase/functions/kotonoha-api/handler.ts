@@ -15,9 +15,9 @@ import {
   MINUTES_MODELS,
   MetadataSchema,
   RetrySchema,
-  minutesToMarkdown,
+  minutesDocuments,
   PatchSchema,
-  renameMarkdownHeading,
+  minutesMarkdownPatch,
   safeError,
 } from "../_shared/domain.mjs";
 import { createDemo } from "../_shared/demo.mjs";
@@ -31,7 +31,8 @@ import {
   validateAttachmentBytes,
 } from "../_shared/attachments.mjs";
 import {
-  CalendarMinutesSchema,
+  AllFormatsMinutesSchema,
+  MINUTES_OUTPUT_TOKENS,
   parseMinutes,
   summaryInput,
 } from "../_shared/summary.mjs";
@@ -94,6 +95,8 @@ const BUCKET = "kotonoha-audio";
 const DOCUMENT_BUCKET = "kotonoha-documents";
 const ORIGINS = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://127.0.0.1:5188",
   "http://localhost:5188",
   "http://127.0.0.1:5189",
@@ -400,7 +403,7 @@ async function finalize(
     return jobUpdate(owner, record, {
       status: "done",
       minutes,
-      markdown: minutesToMarkdown(record.document, minutes),
+      ...minutesDocuments(record.document, minutes),
       completedActions: [],
       error: null,
       minutesStale: false,
@@ -420,13 +423,13 @@ async function startSummary(owner: string, record: RecordRow, key: string) {
   if (m.transcript.length > MAX_TEXT_LENGTH) {
     throw Object.assign(new Error("too long"), { code: "TEXT_TOO_LONG" });
   }
-  const { $schema: _, ...outputSchema } = z.toJSONSchema(CalendarMinutesSchema);
+  const { $schema: _, ...outputSchema } = z.toJSONSchema(AllFormatsMinutesSchema);
   const result = await openai(key, "/responses", {
     method: "POST",
     body: JSON.stringify({
       model: m.minutesModel,
       reasoning: { effort: "medium" },
-      max_output_tokens: 16000,
+      max_output_tokens: MINUTES_OUTPUT_TOKENS,
       background: true,
       store: true,
       input: summaryInput(m),
@@ -1653,14 +1656,7 @@ export async function handler(req: Request) {
     }
     if (!match[2] && req.method === "GET") return json(expose(record));
     if (!match[2] && req.method === "PATCH") {
-      const patch: Doc = PatchSchema.parse(await jsonBody(req));
-      if (patch.title !== undefined && patch.markdown === undefined) {
-        patch.markdown = renameMarkdownHeading(
-          record.document.markdown,
-          record.document.title,
-          patch.title,
-        );
-      }
+      const patch: Doc = minutesMarkdownPatch(record.document, PatchSchema.parse(await jsonBody(req)));
       if (
         patch.completedActions?.some(
           (i: number) => i >= (record.document.minutes?.actions.length || 0),

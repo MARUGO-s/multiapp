@@ -22,7 +22,66 @@ import {
   editFields,
 } from "./fixtures/calendar.mjs";
 import { allCalendarEvents, eventKey } from "../supabase/functions/_shared/calendar.mjs";
-import { summaryInput } from "../supabase/functions/_shared/summary.mjs";
+import { parseMinutes, summaryInput } from "../supabase/functions/_shared/summary.mjs";
+import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
+
+test("1回の生成で3形式を永続化し、閲覧では再解析せず、各形式の編集と失敗時の旧本文を保持する", async (t) => {
+  let summaries = 0, transcriptions = 0, incomplete = false;
+  const { request, store, waitForJobs, dataDir } = await setup(t, {
+    apiKey: key,
+    aiFactory: () => ({
+      async transcribe() { transcriptions++; throw new Error("再文字起こし不要"); },
+      async summarize() {
+        summaries++;
+        const value = minutesBundle(sampleMinutes);
+        if (incomplete) delete value.formats.brief;
+        return value;
+      },
+    }),
+  });
+  const m = { ...createDemo(), isDemo: false, source: "text", template: "standard", tags: ["既存タグ"] };
+  await store.save(m);
+  const route = `/meetings/${m.id}`;
+  const retry = () => request(`${route}/retry`, { method: "POST" });
+  assert.equal((await retry()).status, 202);
+  await waitForJobs();
+  const first = await (await request(route)).json();
+  assert.equal(first.status, "done");
+  assert.deepEqual(Object.keys(first.markdownByFormat), ["brief", "standard", "detailed"]);
+  assert.equal(first.markdown, first.markdownByFormat.standard);
+  const patch = body => request(route, { method: "PATCH", body: JSON.stringify(body) });
+  for (const format of ["brief", "standard", "detailed"]) {
+    assert.equal((await patch({ markdown: `# ${m.title}\n${format}の修正`, markdownFormat: format })).status, 200);
+  }
+  assert.equal(summaries, 1);
+  assert.equal(transcriptions, 0);
+  let current = await (await request(route)).json();
+  for (const format of ["brief", "standard", "detailed"])
+    assert.match(current.markdownByFormat[format], new RegExp(`${format}の修正`));
+  assert.deepEqual(current.minutes, first.minutes);
+  assert.equal((await patch({ title: "変更後の会議" })).status, 200);
+  const reloaded = new MeetingStore(path.join(dataDir, "meetings"));
+  await reloaded.init();
+  current = reloaded.get(m.id);
+  for (const md of Object.values(current.markdownByFormat)) assert.ok(md.startsWith("# 変更後の会議\n"));
+  assert.equal((await patch({ markdownFormat: "brief" })).status, 400);
+  assert.equal((await patch({ markdown: "x", markdownFormat: "invalid" })).status, 400);
+  incomplete = true;
+  assert.equal((await retry()).status, 202);
+  await waitForJobs();
+  const failed = await (await request(route)).json();
+  assert.equal(failed.status, "error");
+  assert.deepEqual(failed.markdownByFormat, current.markdownByFormat);
+  assert.deepEqual(failed.minutes, current.minutes);
+  incomplete = false;
+  assert.equal((await retry()).status, 202);
+  await waitForJobs();
+  assert.equal(store.get(m.id).status, "done");
+  assert.doesNotMatch(store.get(m.id).markdownByFormat.brief, /briefの修正/);
+  assert.deepEqual(store.get(m.id).tags, ["既存タグ"]);
+  assert.equal(summaries, 3);
+  assert.equal(transcriptions, 0);
+});
 
 test("再生成時に詳しさを変更・保存し、文字起こしは再利用する", async (t) => {
   const seen = [];
@@ -34,7 +93,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
       async summarize(meeting) {
         seen.push(meeting.template);
         assert.equal(meeting.transcript, "保存済みの会話");
-        assert.match(summaryInput(meeting)[0].content, meeting.template === "detailed" ? /背景、理由、異論も詳しく/ : /要点を簡潔に/);
+        assert.match(summaryInput(meeting)[0].content, { detailed: /背景、理由、異論も詳しく/, brief: /要点を簡潔に/, standard: /要点を適度に詳しく/ }[meeting.template]);
         return { ...sampleMinutes, summary: `再生成：${meeting.template}` };
       },
     }),
@@ -42,7 +101,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
   const meeting = { ...createDemo(), isDemo: false, source: "audio", audioFile: "already.wav", transcript: "保存済みの会話", tags: ["既存タグ"], completedActions: [0] };
   await store.save(meeting);
   const route = `/meetings/${meeting.id}/retry`;
-  for (const body of [JSON.stringify({template: "detailed"}), JSON.stringify({template: "brief"}), undefined]) {
+  for (const body of [JSON.stringify({template: "detailed"}), JSON.stringify({template: "standard"}), JSON.stringify({template: "brief"}), undefined]) {
     const response = await request(route, { method: "POST", body });
     assert.equal(response.status, 202);
     await waitForJobs();
@@ -52,7 +111,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
     assert.deepEqual(saved.tags, ["既存タグ"]);
     assert.deepEqual(saved.completedActions, []);
   }
-  assert.deepEqual(seen, ["detailed", "brief", "brief"]);
+  assert.deepEqual(seen, ["detailed", "standard", "brief", "brief"]);
   assert.equal(transcriptions, 0);
   const reloaded = new MeetingStore(path.join(dataDir, "meetings"));
   await reloaded.init();
@@ -62,7 +121,7 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
     assert.equal((await request(route, { method: "POST", body })).status, 400);
     assert.deepEqual(store.get(meeting.id), before);
   }
-  assert.equal(seen.length, 3);
+  assert.equal(seen.length, 4);
 });
 
 test("再生成時に解析モデルを選べ、接続設定のモデルは変更しない", async (t) => {
@@ -1144,7 +1203,7 @@ test("実際のSDKリクエストはGPT Transcribeと指定のAstra/Sol/Lunaを�
               content: [
                 {
                   type: "output_text",
-                  text: JSON.stringify(sampleMinutes),
+                  text: JSON.stringify(minutesBundle(sampleMinutes)),
                   annotations: [],
                 },
               ],
@@ -1162,7 +1221,7 @@ test("実際のSDKリクエストはGPT Transcribeと指定のAstra/Sol/Lunaを�
       ...createDemo(),
       transcript: transcript.transcript,
     });
-    assert.deepEqual(result, sampleMinutes);
+    assert.deepEqual(result, parseMinutes(createDemo(), minutesBundle(sampleMinutes)));
     assert.equal(calls.length, 2);
   }
 });

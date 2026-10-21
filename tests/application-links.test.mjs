@@ -81,6 +81,19 @@ test("Launcher preserves seven app links and adds a separate admin-only destinat
   }
 });
 
+test("mimiyori launcher describes review and gourmet-site management, not reservations", () => {
+  assert.deepEqual(
+    applicationLinks.find((app) => app.id === "gourmet"),
+    {
+      id: "gourmet",
+      name: "mimiyori",
+      note: "口コミ・グルメサイト管理",
+      icon: "gourmet",
+      href: "https://marugo-s.github.io/gourmet/",
+    },
+  );
+});
+
 test("SNS launcher opens Instatic TalksX without adding it to shared login", () => {
   assert.deepEqual(
     applicationLinks.find((app) => app.id === "sns"),

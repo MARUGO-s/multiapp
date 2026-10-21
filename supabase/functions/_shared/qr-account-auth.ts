@@ -1,3 +1,5 @@
+import { hashToken, validTokenFormat } from "./session.mjs";
+
 export class AccountError extends Error {
   constructor(
     public status: number,
@@ -15,6 +17,7 @@ function config() {
     throw new AccountError(503, "接続の設定が完了していません。");
   return { base, key };
 }
+// Identity-only callers (including Google linking) accept native Auth JWTs.
 export async function qrIdentity(req: Request): Promise<string> {
   const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/i)?.[1];
   if (
@@ -52,6 +55,11 @@ const messages: Record<string, [number, string]> = {
   STORE_FORBIDDEN: [403, "この店舗のデータを操作する権限がありません。"],
   ADMIN_REQUIRED: [403, "全店舗管理者だけが操作できます。"],
   INVALID_STORE: [400, "有効な所属店舗を選択してください。"],
+  SHARED_QR_FORBIDDEN: [403, "共通IDのQR利用が許可されていません。"],
+  INVALID_SESSION: [
+    401,
+    "ログインの有効期限が切れています。再度ログインしてください。",
+  ],
   MEMBER_NOT_FOUND: [404, "登録アカウントが見つかりません。"],
   SELF_PROTECTED: [
     409,
@@ -97,9 +105,50 @@ export async function accountRpc(
   return result;
 }
 export async function qrScope(req: Request, url: URL) {
-  const actor = await qrIdentity(req);
   const store = url.searchParams.get("storeId");
   if (store !== null && !uuidPattern.test(store))
     throw new AccountError(400, "店舗IDが正しくありません。");
-  return await accountRpc("scope", actor, store);
+  const sharedHash = await qrSharedTokenHash(req);
+  if (sharedHash) return await sharedAccountRpc("scope", sharedHash, store);
+  return await accountRpc("scope", await qrIdentity(req), store);
+}
+
+export async function qrSharedTokenHash(req: Request): Promise<string | null> {
+  const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/i)?.[1];
+  return validTokenFormat(token) ? await hashToken(token!) : null;
+}
+
+export async function sharedAccountRpc(
+  operation: string,
+  tokenHash: string,
+  store: string | null = null,
+  target: string | null = null,
+  payload: unknown = {},
+) {
+  const { base, key } = config();
+  const response = await fetch(`${base}/rest/v1/rpc/marugo_qr_shared`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_operation: operation,
+      p_token_hash: tokenHash,
+      p_store: store,
+      p_target: target,
+      p_payload: payload,
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  const result = await response.json();
+  if (!response.ok) {
+    const [status, message] = messages[result.message] ?? [
+      503,
+      "保存・権限の確認結果を取得できませんでした。もう一度お試しください。",
+    ];
+    throw new AccountError(status, message);
+  }
+  return result;
 }

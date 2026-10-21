@@ -2,14 +2,52 @@
 
 ## 対象
 
-- GitHub: `MARUGO-s/OEM`、Pages `/OEM/`、`main` のGitHub Actionsでフロントを公開。
+- GitHub: `MARUGO-s/multiapp`、Pages `https://marugo-waltz.com/`、`main` のGitHub Actionsでフロントを公開。
 - Supabase: `Recipe-Management` / `hjhkccbktkscwtgzxjfq`。他アプリと共用。
 - 追加領域: `kotonoha.meetings`、`kotonoha.settings`、`kotonoha.access_config`、`kotonoha.sessions`、`kotonoha.login_attempts`、service_role限定RPC `public.kotonoha_store` / `public.kotonoha_auth`、非公開バケット `kotonoha-audio`、Edge Function `kotonoha-api`。
-- Authユーザー・設定・既存のOpenAIキーは変更しない。フロントにあるのは公開用publishable keyのみ。
+- Authユーザー・既存のOpenAIキーは変更しない。独自ドメイン対応ではAuthのredirect許可リストだけを追加し、Site URLと他設定を保持する。フロントにあるのは公開用publishable keyのみ。
 
 ## 更新
 
+### 独自ドメイン運用（2026-10-20）
+
+公開先は `https://marugo-waltz.com/`。`actions/configure-pages`をbuildより前に実行し、`base_path`へ末尾 `/` を付けた値を`VITE_BASE_PATH`として渡す。Viteのproduction既定は `/`、従来project URLでの再配布は`VITE_BASE_PATH=/multiapp/`を明示する。旧prefixのまま独自ドメインrootへ配布するとmoduleが404になり白画面になる。HTTPS強制を有効にし、kotonoha-api/marugo-accounts/marugo-qrでHTTPSのapex/wwwを完全一致許可する。Supabase Authの既存Site URL・他アプリcallbackを保持し、両hostの`/?account=google|confirm|recovery`6件を正確に追加する。Google側callbackはSupabase既存URLのまま。DB migrationや業務行変更は不要。directory管理APIはこのQR修正の対象外。
+
+回帰は`node --test tests/pages-base.test.mjs`、cross-handlerの`cloud-custom-domain.test.ts`は **kotonoha-api/deno.json** で実行する。`scripts/check-domain-browser.mjs`は既定でdistを一時HTTP公開しPC/phoneのlogin・入力保持・trackingロードを確認し、APIは全て代替応答にする。公開確認は`DOMAIN_SMOKE_URL=https://marugo-waltz.com/`を指定する。本物のログイン/保存成功を意味しない。ロールバックは既存保存データ/URLを維持し、独自ドメインが有効な限りroot配信を保つ。単純な旧asset復元は白画面を再発させる。
+
+### 2026-10-18 JST 店舗名の共有保存・PNG下部表示（本番反映済み）
+
+ユーザー承認の59px・追加上余白なしで公開。対象projectは`hjhkccbktkscwtgzxjfq`、追加migration `20261018100000_qr_store_name.sql`1件だけを限定適用し、`marugo-qr` v15（ACTIVE/verify_jwt=false、全11ソース一致、他25関数不変）→Pagesの順で反映した。PR #54/main `5bf2c517539b432355fed69c10d150007cc2e6eb`、Pages `39122112274`成功。既存QR20/ファイル14/履歴23の全既存フィールド・無関係定義はtransaction内指紋一致。公開56ファイル/112取得がCI成果物と一致、PC/スマホの代替APIで店名編集・再表示・非表示・実PNG保存・QR画素不変を確認。本番業務テスト送信0。実認証/業務保存・撮影/印刷の保証は別範囲。ロールバック時は保存済み店名/初回upload店名を削除せず、店名入力を無視する旧APIへ単純に戻さない。詳細・検証限界は[中央ロゴ](docs/qr-logos.md)を参照。
+
+### 2026-10-18 JST 店舗ロゴ23点の追加（本番反映・公開確認済み）
+
+店舗23＋従来SNS15の38固定IDを公開済み。2026-10-17のユーザー「デプロイして」に基づき、独立レビューと親の全1,830復号成功を経てPR #52を統合しました。main `ee8ca957b69aef8aa1d763841258760a6b96db58`、Pages `39046605816` は成功。公開HTML/遅延JS/MJS/CSS/PNGの56ファイルを通常/キャッシュ回避の計112取得でCI成果物と照合し、PC/スマホの公開画面で39選択肢・作成/変更/再表示/解除・PNG同一URLを代替APIで確認しました。実利用者認証・本番業務レコードの試験登録・撮影/印刷は未検証です。状態と全証跡は [中央ロゴ](docs/qr-logos.md) を参照。
+
+対象 `Recipe-Management / hjhkccbktkscwtgzxjfq` とQR専用CLI profile `marugo-qr-release-20261017` を確認し、新migration `20261017204127_qr_store_logo_catalog.sql` **1件だけ** → capability gate付き `marugo-qr` v14 → フロント/38 PNGの順で反映しました。正確な運用wrapperを隔離PGでリハーサルし、適用transaction内のQR17/ファイル11/履歴21の全既存フィールドと他定義の不変を確認。台帳/validator/RPC/権限を再読戻しし、EdgeはACTIVE/verify_jwt=false・全10ソース一致・他25関数不変を確認しました。SNS migration再適用・共用db push/reset・列/RPC/Storage/Auth/他Edge/業務レコードの変更はありません。ロールバックは保存済み38 IDとcapability gateを解釈する互換版で行い、旧v13/15点画面へ単純に戻して保護を失わないようにします。Obsidian/Graphifyは正本から更新し、知識のfreshness・リンク・内容も別途読み戻します。
+
+### 2026-10-17 MARUGO QRの中央ロゴ（本番反映・公開確認済み）
+
+中央ロゴをQRごとに共有保存する変更を、DB → `marugo-qr` v13 → フロント/静的PNGの順で反映しました。機能コミットは `17d0841d044a8ef0066f69a3710e9e1076cf1578`（PR #49）、Pages実行 `39026269571` は成功。公開HTML・全JS/MJS/CSS・15点のPNGを通常/キャッシュ回避の計66取得でCI成果物と照合し、PC/スマホの公開画面を代替APIで動かしてPNGの復号を確認しました。QR専用CLIプロフィールは `marugo-qr-release-20261017`。既存QR16件・ファイル10件・履歴21件は適用トランザクション内の指紋検査で不変、他のpublic定義・Storageポリシー・Edge Function25件も不変でした。既存の会議録・他アプリ・Auth・鍵・バケット・計測URLは変更していません。本番業務QRの作成/編集による実データ試験や、実端末撮影・印刷の保証は行っていません。
+
+1. `Recipe-Management / hjhkccbktkscwtgzxjfq` へアクセスできることと、本番の既存QR関数・マイグレーション状態を読み取りで確認する。貸借管理やLINE Reportの別プロジェクトへ適用しない。
+2. `supabase/migrations/20261017100000_qr_logo_selection.sql` **1件のみ**をレビュー済み状態で適用する。QR専用のnullable列2件・許可ID検証と管理/ファイルRPCのみを変更する。`db push/reset` は使わない。元コード・回数・履歴のバックフィルはしない。
+3. 変更した `marugo-qr` だけをデプロイし、関数の配布版とロゴ操作の互換性を確認する。`kotonoha-api` / `marugo-accounts` の再デプロイや認証変更は不要。
+4. 対応コミットをmainへ統合してPagesを公開する。15点のPNGも `public/qr-logos/` から配信される。対象SHAのActions成功に加え、公開PNG全件の通常/キャッシュ回避取得を `docs/qr-logo-assets.json` のSHA-256と照合する。
+5. 公開されたJSと、許可範囲内の読み取り/操作を確認してから反映済みと記録し、ObsidianとGraphifyも更新する。本番の業務QRを検証のために勝手に作成/編集しない。
+
+旧フロントは追加列を無視でき、新サーバーは省略/nullをロゴなしとして処理します。ロールバックは互換性のあるフロント/Edgeへ戻し、追加列や保存済みQR/ファイル/履歴を削除しません。詳細・復号検証・ローカル共有保存テストは [中央ロゴ](docs/qr-logos.md) を参照してください。
+
+2026-10-08の新規作成ポップアップ簡素化はフロントのみです。形式カード・初期表示プルダウンを廃止し、新しい会議は3形式を作って標準版から表示します。参加者・添付資料・独自の会議設定は任意欄にまとめます。既存会議の設定・本文・認証・DB・Edge Functionは変更しません。
+
 フロントは `main` に反映するとビルド・テスト後にPagesへ公開します。Supabaseの自動マイグレーションはしません。
+
+2026-10-08の議事録基本形式（要約／標準／詳細）対応は、共有の形式定義・生成指示・Markdown構成とフロント表示の変更です。保存形式のIDとAI応答スキーマは維持し、DBマイグレーション・認証設定・秘密情報の変更はありません。変更した `kotonoha-api` のみを上記対象プロジェクトにデプロイし、PRをmainへマージしてActions／Pagesを確認します。新規作成・明示的な再生成だけに適用され、保存済み本文は書き換えません。旧本文の箇条書き・チェックリスト表示も維持します。
+
+同日の3形式同時生成対応では、AI応答を共通の決定・作業・確認事項・予定＋3形式の要旨／議題に拡張します。会議documentの `minutes.formats` と `markdownByFormat` に保存するため、DBマイグレーションは不要です。Edge Function `kotonoha-api` を先に更新し、Pagesを公開します。認証・鍵・Storage・他アプリは変更しません。以前の形式と更新前に開始した応答も読めます。既存会議の一括再解析は実行しません。ロールバック時は3形式を読み取れる版を維持してください。旧APIで本文を編集すると形式別本文と不整合になるため、フロントだけを戻す場合もこのAPIを残します。
+
+QR分析の「延べアクセスを主指標／ブラウザー単位の参考値」への表示改善はフロントのみです。未計測・対象外と0件の区別も表示側で行います。DB・Edgeの変更、履歴の補正、匿名ID・IPによる端末推定の追加はありません。PRをマージしてPagesの成功と公開画面を確認します。ローカル画面検証は `node scripts/check-qr-analytics-ui.mjs`（5196番、架空データのみ）で行えます。
+
+2026-10-07のお披露目用共通QRログインは、未適用の `20261007100000_shared_qr_login.sql` だけを対象プロジェクトに適用し、`marugo-accounts` と `marugo-qr` を先に更新してからPagesを公開します。`kotonoha-api` のパスワードやログイン処理は変更不要です。共通セッションの期限・失効・パスワード認証由来を要求ごとに確認します。共通権限の停止はREADMEの `qr_shared_login_enabled=false` で行います。
 
 AAC・複数録音対応はEdge Functionとフロントの更新のみで、DBマイグレーションは不要です。専用会議documentの `audioParts` に順序・保存パス・完了済み文字起こしを保持します。旧 `audio_path` は先頭音声を指し、既存単一録音にはフォールバックします。AACは保存前にM4Aへ変換するため、既存バケットのMIME制限・容量設定も変更しません。ロールバックする際は複数録音に対応した版を維持してください（旧版では先頭以外の録音を処理できません）。
 

@@ -1,7 +1,11 @@
 import {
   fileSpecification,
   matchesFileSignature,
+  QR_FILE_TYPE_LABEL,
+  responseMimeMatches,
 } from "../_shared/qr-files.mjs";
+import { storeNamePayload } from "../_shared/qr-store-name.mjs";
+import { validateLogoId } from "../_shared/qr-logos.mjs";
 
 export class FileError extends Error {
   constructor(
@@ -70,7 +74,6 @@ async function verified(file: any) {
   const total =
     response.headers.get("content-range")?.split("/").at(-1) ??
     response.headers.get("content-length");
-  const mime = response.headers.get("content-type")?.split(";")[0];
   const reader = response.body.getReader();
   const prefix = new Uint8Array(32);
   let offset = 0;
@@ -87,12 +90,12 @@ async function verified(file: any) {
   }
   if (
     Number(total) !== Number(file.size) ||
-    mime !== file.mime ||
+    !responseMimeMatches(file.mime, response.headers.get("content-type")) ||
     !matchesFileSignature(file.mime, prefix.subarray(0, offset))
   )
     throw new FileError(
       400,
-      "ファイルの内容・種類・サイズが一致しません。正しいPDF・JPG・PNGを選択してください。",
+      `${QR_FILE_TYPE_LABEL}の内容・種類・サイズが一致しません。`,
     );
 }
 export async function publicFile(code: string, rpc: Rpc) {
@@ -135,7 +138,12 @@ export async function prepareFile(
     p_operation: "init",
     p_owner: owner,
     p_id: input.id,
-    p_payload: { title: input.title.trim(), ...spec },
+    p_payload: {
+      title: input.title.trim(),
+      ...spec,
+      logoId: validateLogoId(input.logoId),
+      ...storeNamePayload(input),
+    },
   });
   if (file.link) return { link: file.link };
   // A retry after an uncertain upload skips the upload if a valid object exists.

@@ -14,13 +14,16 @@ import { QrAccountManagement } from "./QrAccountManagement";
 import { QrScopeContext } from "./qr-api";
 import {
   accountApi,
+  qrCredentials,
   qrAuth,
   type QrAccountContext,
   type QrStore,
 } from "./qr-account-client";
+import { getSession, SESSION_EVENT, signOut as signOutShared } from "./cloud";
 
 export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const [context, setContext] = useState<QrAccountContext | null>(null);
+  const [credentialKey, setCredentialKey] = useState("");
   const [storeId, setStoreId] = useState("");
   const [tab, setTab] = useState<"qr" | "trash" | "accounts">("qr");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -83,16 +86,19 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const refresh = useCallback(async () => {
     const request = ++revision.current;
     try {
-      const {
-        data: { session },
-      } = await qrAuth.auth.getSession();
-      if (!session) {
+      let credentials;
+      try {
+        credentials = await qrCredentials();
+      } catch {
         chooseRef.current();
         return;
       }
-      identity.current = session.user.id;
+      identity.current = credentials.identityKey;
       let next = await accountApi<QrAccountContext>("/context");
-      const requested = session.user.user_metadata?.marugo_qr_store_id;
+      const requested =
+        credentials.kind === "account"
+          ? credentials.user.user_metadata?.marugo_qr_store_id
+          : null;
       if (
         !next.member &&
         typeof requested === "string" &&
@@ -103,6 +109,9 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
           body: JSON.stringify({ storeId: requested }),
         });
       if (request !== revision.current) return;
+      if ((await qrCredentials()).identityKey !== credentials.identityKey)
+        return;
+      setCredentialKey(credentials.identityKey);
       setContext(next);
       setError("");
       setStoreId((previous) =>
@@ -150,12 +159,23 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
         }, 0);
       }
     });
+    const onSharedSession = () => {
+      ++revision.current;
+      setContext(null);
+      setCredentialKey("");
+      setLoading(true);
+      setTimeout(() => void refresh(), 0);
+    };
+    window.addEventListener(SESSION_EVENT, onSharedSession);
+    window.addEventListener("storage", onSharedSession);
     const interval = setInterval(() => {
       if (!document.hidden) void refresh();
     }, 30000);
     return () => {
       ++revision.current;
       subscription.unsubscribe();
+      window.removeEventListener(SESSION_EVENT, onSharedSession);
+      window.removeEventListener("storage", onSharedSession);
       clearInterval(interval);
     };
   }, [refresh]);
@@ -173,12 +193,13 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
   const scope = useMemo(
     () =>
       context?.member && storeId
-        ? { userId: context.member.user_id, storeId }
+        ? { userId: context.member.user_id, storeId, credentialKey }
         : null,
-    [context?.member?.user_id, storeId],
+    [context?.member?.user_id, storeId, credentialKey],
   );
   const active = context?.member?.status === "active";
   const admin = active && context?.member?.role === "admin";
+  const canManageAccounts = admin;
   const selected = context?.stores.find((store) => store.id === storeId);
   const pageTitle =
     admin && tab === "accounts"
@@ -281,7 +302,7 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
             <Trash2 size={20} />
             ゴミ箱
           </button>
-          {admin && (
+          {canManageAccounts && (
             <button
               className={tab === "accounts" ? "active" : ""}
               aria-current={tab === "accounts" ? "page" : undefined}
@@ -306,14 +327,16 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
             className="settings-link"
             disabled={qrBusy}
             onClick={async () => {
-              const { error: failure } = await qrAuth.auth.signOut({
-                scope: "local",
-              });
-              if (failure)
-                notify("ログアウトできませんでした。再度お試しください。");
-              else {
+              try {
+                if (getSession()) await signOutShared();
+                const { error: failure } = await qrAuth.auth.signOut({
+                  scope: "local",
+                });
+                if (failure) throw failure;
                 setContext(null);
                 onChooseApp();
+              } catch {
+                notify("ログアウトできませんでした。再度お試しください。");
               }
             }}
           >
@@ -441,7 +464,7 @@ export function QrWorkspace({ onChooseApp }: { onChooseApp: () => void }) {
                   </button>
                 </div>
               )}
-              {admin && tab === "accounts" ? (
+              {canManageAccounts && tab === "accounts" ? (
                 <QrAccountManagement
                   stores={context!.stores.filter((store) => !store.legacy)}
                   currentUserId={context!.member!.user_id}

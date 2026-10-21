@@ -1,5 +1,13 @@
-import { useState, type FormEvent } from "react";
-import { Check, KeyRound, LoaderCircle, Sparkles, Zap, Bell } from "lucide-react";
+import { useState, type FormEvent, type InvalidEvent } from "react";
+import {
+  Check,
+  ChevronDown,
+  KeyRound,
+  LoaderCircle,
+  Sparkles,
+  Zap,
+  Bell,
+} from "lucide-react";
 import { Modal } from "./Modal";
 import { api } from "./api";
 import type { Settings } from "./types";
@@ -24,8 +32,27 @@ export function SettingsDialog({
   const [transcriptionModel, setTranscriptionModel] = useState(
     settings?.transcriptionModel || "gpt-transcribe",
   );
+  const [openAiExpanded, setOpenAiExpanded] = useState(!settings?.configured);
+  const [geminiExpanded, setGeminiExpanded] = useState(
+    !settings?.geminiConfigured &&
+      settings?.transcriptionModel === "gemini-3.5-transcribe",
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  function revealInvalidKey(
+    e: InvalidEvent<HTMLInputElement>,
+    provider: "openai" | "gemini",
+  ) {
+    // A collapsed invalid field must be revealed before it can receive focus.
+    e.preventDefault();
+    const input = e.currentTarget;
+    if (provider === "openai") setOpenAiExpanded(true);
+    else setGeminiExpanded(true);
+    setError(
+      `${provider === "openai" ? "OpenAI" : "Gemini"} APIキーは20文字以上で入力してください。`,
+    );
+    requestAnimationFrame(() => input.focus());
+  }
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -56,73 +83,95 @@ export function SettingsDialog({
       onClose={onClose}
       locked={busy}
     >
-      <form onSubmit={submit}>
-        <div className="provider-heading">
-          <span className="provider-icon">
-            <KeyRound size={20} />
-          </span>
-          <div>
-            <strong>OpenAI API</strong>
-            <small>
-              {settings?.configured ? "APIキー設定済み" : "APIキー未設定"}
-            </small>
-          </div>
-          {settings?.configured && <Check size={18} className="green" />}
+      <form onSubmit={submit} className="ai-settings-form">
+        <div className="api-connections">
+          <details
+            className="api-connection"
+            open={openAiExpanded}
+            onToggle={(e) => setOpenAiExpanded(e.currentTarget.open)}
+          >
+            <summary>
+              <KeyRound size={18} />
+              <strong>OpenAI API</strong>
+              <span
+                className={`api-connection-status ${settings?.configured ? "configured" : ""}`}
+              >
+                {settings?.configured && <Check size={14} />}
+                {settings?.configured ? "設定済み" : "未設定"}
+              </span>
+              <ChevronDown size={16} className="api-connection-chevron" />
+            </summary>
+            <div className="api-connection-body">
+              <label className="field">
+                APIキー
+                <input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  placeholder={
+                    settings?.configured ? "変更する場合のみ入力" : "sk-…"
+                  }
+                  minLength={20}
+                  required={!settings?.configured}
+                  disabled={busy}
+                  onInvalid={(e) => revealInvalidKey(e, "openai")}
+                />
+                <span className="field-hint">
+                  {isCloud
+                    ? "キーはこのワークスペース共通で暗号化保存し、画面には再表示しません。ログインした全員がこのキーで解析を実行します。他アプリのキーとは共用しません。"
+                    : "キーはサーバーのメモリにだけ保持し、画面には再表示しません。再起動時は再設定が必要です。"}
+                </span>
+              </label>
+            </div>
+          </details>
+          <details
+            className="api-connection"
+            open={geminiExpanded}
+            onToggle={(e) => setGeminiExpanded(e.currentTarget.open)}
+          >
+            <summary>
+              <KeyRound size={18} />
+              <strong>Google Gemini API</strong>
+              <span
+                className={`api-connection-status ${settings?.geminiConfigured ? "configured" : ""}`}
+              >
+                {settings?.geminiConfigured && <Check size={14} />}
+                {settings?.geminiConfigured ? "設定済み" : "未設定"}
+              </span>
+              <ChevronDown size={16} className="api-connection-chevron" />
+            </summary>
+            <div className="api-connection-body">
+              <label className="field">
+                Gemini APIキー
+                <input
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder={
+                    settings?.geminiConfigured
+                      ? "変更する場合のみ入力"
+                      : "AIza…"
+                  }
+                  minLength={20}
+                  disabled={busy}
+                  onInvalid={(e) => revealInvalidKey(e, "gemini")}
+                  required={
+                    transcriptionModel === "gemini-3.5-transcribe" &&
+                    !settings?.geminiConfigured
+                  }
+                />
+                <span className="field-hint">
+                  Geminiを選んだ場合のみ音声をGoogleへ送信します。Geminiで文字起こしが完了しなかった録音は、自動でGPT
+                  Transcribeに切り替えます（その録音の音声はOpenAIにも送信されます）。キーはOpenAIキーとは別に保存します。
+                </span>
+              </label>
+            </div>
+          </details>
         </div>
-        <label className="field">
-          APIキー
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={settings?.configured ? "変更する場合のみ入力" : "sk-…"}
-            minLength={20}
-            required={!settings?.configured}
-          />
-          <span className="field-hint">
-            {isCloud
-              ? "キーはこのワークスペース共通で暗号化保存し、画面には再表示しません。ログインした全員がこのキーで解析を実行します。他アプリのキーとは共用しません。"
-              : "キーはサーバーのメモリにだけ保持し、画面には再表示しません。再起動時は再設定が必要です。"}
-          </span>
-        </label>
-        <div className="provider-heading">
-          <span className="provider-icon">
-            <KeyRound size={20} />
-          </span>
-          <div>
-            <strong>Google Gemini API</strong>
-            <small>
-              {settings?.geminiConfigured
-                ? "APIキー設定済み"
-                : "Gemini使用時に設定"}
-            </small>
-          </div>
-          {settings?.geminiConfigured && <Check size={18} className="green" />}
-        </div>
-        <label className="field">
-          Gemini APIキー
-          <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-            placeholder={
-              settings?.geminiConfigured ? "変更する場合のみ入力" : "AIza…"
-            }
-            minLength={20}
-            required={
-              transcriptionModel === "gemini-3.5-transcribe" &&
-              !settings?.geminiConfigured
-            }
-          />
-          <span className="field-hint">
-            Geminiを選んだ場合のみ音声をGoogleへ送信します。Geminiで文字起こしが完了しなかった録音は、自動でGPT
-            Transcribeに切り替えます（その録音の音声はOpenAIにも送信されます）。キーはOpenAIキーとは別に保存します。
-          </span>
-        </label>
         <fieldset className="model-options">
           <legend>文字起こし</legend>
           {[
@@ -148,7 +197,14 @@ export function SettingsDialog({
                 name="transcriptionModel"
                 value={id}
                 checked={transcriptionModel === id}
-                onChange={() => setTranscriptionModel(id)}
+                onChange={() => {
+                  setTranscriptionModel(id);
+                  if (
+                    id === "gemini-3.5-transcribe" &&
+                    !settings?.geminiConfigured
+                  )
+                    setGeminiExpanded(true);
+                }}
               />
               <Icon size={22} />
               <span>
@@ -208,7 +264,11 @@ export function SettingsDialog({
                 アプリを開いている間、共有カレンダーの確定済み期限を通知します。同じ期限はこのタブで一度だけ通知します。
               </small>
               <span className="notification-status">
-                {notificationPermission === "granted" ? "有効" : notificationPermission === "denied" ? "無効" : "未設定"}
+                {notificationPermission === "granted"
+                  ? "有効"
+                  : notificationPermission === "denied"
+                    ? "無効"
+                    : "未設定"}
               </span>
             </span>
             {notificationPermission !== "granted" && (

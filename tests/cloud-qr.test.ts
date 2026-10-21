@@ -30,6 +30,8 @@ globalThis.fetch = async (input, init: any) => {
   }
   const args = JSON.parse(init!.body as string);
   const name = url.pathname.split("/").pop()!;
+  if (name === "marugo_qr_shared")
+    return Response.json({ message: "INVALID_SESSION" }, { status: 400 });
   calls.push({ name, args });
   assert.equal(
     new Headers(init?.headers).get("authorization"),

@@ -13,6 +13,7 @@ function PublicQrFile() {
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [html, setHtml] = useState("");
   useEffect(() => {
     document.title = "公開ファイル — MARUGO QR";
     let alive = true;
@@ -51,6 +52,32 @@ function PublicQrFile() {
       abort.abort();
     };
   }, [code, reload]);
+  useEffect(() => {
+    if (file?.mime !== "text/html") return;
+    let alive = true;
+    const abort = new AbortController();
+    setHtml("");
+    fetch(file.url, {
+      signal: abort.signal,
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("HTMLを表示できませんでした。");
+        return response.text();
+      })
+      .then((text) => {
+        if (alive) setHtml(text);
+      })
+      .catch((error) => {
+        if (alive && error?.name !== "AbortError")
+          setError("HTMLを表示できませんでした。ページを再読み込みしてください。");
+      });
+    return () => {
+      alive = false;
+      abort.abort();
+    };
+  }, [file]);
   return (
     <main className="public-qr-file" aria-label="公開ファイル">
       <header>
@@ -66,6 +93,15 @@ function PublicQrFile() {
       {file && (
         file.mime === "application/pdf" ? (
           <PdfPreview key={file.url} url={file.url} />
+        ) : file.mime === "text/html" && html ? (
+          <iframe
+            title="公開HTML"
+            srcDoc={html}
+            sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+            referrerPolicy="no-referrer"
+          />
+        ) : file.mime === "text/html" ? (
+          <p role="status">HTMLを準備しています…</p>
         ) : (
           <img src={file.url} alt="公開画像" referrerPolicy="no-referrer" />
         )

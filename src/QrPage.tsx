@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import QRCode from "qrcode";
+import { qrImageWithStoreNameDataUrl } from "./qr-caption.mjs";
 import {
   ArrowDownToLine,
   Copy,
@@ -18,10 +18,14 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useQrApi, type QrHistory, type QrLink, trackingUrl } from "./qr-api";
+import { copiedShareUrl, useQrApi, type QrHistory, type QrLink, trackingUrl } from "./qr-api";
 import { isCloud } from "./cloud";
 import { QrAnalytics } from "./QrAnalytics";
 import { QrFileUpload } from "./QrFileUpload";
+import { QrLogoPicker } from "./QrLogoPicker";
+import { QrStoreNameField } from "./QrStoreNameField";
+import { QR_LOGOS } from "../supabase/functions/_shared/qr-logos.mjs";
+import { validateStoreName } from "../supabase/functions/_shared/qr-store-name.mjs";
 import { Modal } from "./Modal";
 import { lifecycleRequest } from "./qr-lifecycle.mjs";
 import {
@@ -52,6 +56,16 @@ export function QrPage({
   const qrApi = useQrApi();
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
+  const [creationLogoId, setCreationLogoId] = useState<string | null>(null);
+  const [creationStoreName, setCreationStoreName] = useState<string | null>(
+    null,
+  );
+  function chooseCreationLogo(logoId: string | null) {
+    if (busy || filePending || logoId === creationLogoId) return;
+    setCreationLogoId(logoId);
+    setCreationStoreName(null);
+  }
+  const [filePending, setFilePending] = useState(false);
   const [links, setLinks] = useState<QrLink[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -77,7 +91,36 @@ export function QrPage({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<QrLink | null>(null);
-  const [qr, setQr] = useState("");
+  const [logoDraft, setLogoDraft] = useState<{
+    id: string;
+    logoId: string | null;
+    storeName: string | null;
+  } | null>(null);
+  const [logoError, setLogoError] = useState("");
+  const [savingLogo, setSavingLogo] = useState(false);
+  const draftLogoId =
+    logoDraft?.id === selected?.id
+      ? (logoDraft?.logoId ?? null)
+      : (selected?.logo_id ?? null);
+  const draftStoreName =
+    logoDraft?.id === selected?.id
+      ? (logoDraft?.storeName ?? null)
+      : (selected?.store_name ?? null);
+  const logoChanged =
+    !!selected &&
+    (draftLogoId !== (selected.logo_id ?? null) ||
+      draftStoreName !== (selected.store_name ?? null));
+  const [qrImage, setQrImage] = useState<{ key: string; url: string } | null>(
+    null,
+  );
+  const qrKey = selected
+    ? JSON.stringify([
+        selected.code,
+        selected.logo_id ?? null,
+        selected.store_name ?? null,
+      ])
+    : "";
+  const qr = qrImage?.key === qrKey ? qrImage.url : "";
   const [qrError, setQrError] = useState("");
   const [history, setHistory] = useState<QrHistory | null>(null);
   const [historyPage, setHistoryPage] = useState(0);
@@ -87,6 +130,8 @@ export function QrPage({
     id: string;
     title: string;
     targetUrl: string;
+    logoId: string | null;
+    storeName: string | null;
   } | null>(null);
   const mounted = useRef(true);
   const currentPage = useRef(page);
@@ -96,6 +141,9 @@ export function QrPage({
     return () => onBusyChange?.(false);
   }, [busy, onBusyChange]);
   const listRequest = useRef(0);
+  const createdSelection = useRef<string | null>(null);
+  const selectedId = useRef(selected?.id);
+  selectedId.current = selected?.id;
   currentPage.current = page;
   currentView.current = view;
   useEffect(() => {
@@ -115,7 +163,7 @@ export function QrPage({
       listRequest.current === requestId;
     try {
       const data = await qrApi<{ links: QrLink[]; total: number }>(
-        `/links?page=${page}&view=${view}`,
+        `/links?page=${page}&view=${view}&kinds=1`,
       );
       if (!current()) return;
       if (page > 0 && page * 50 >= data.total) {
@@ -125,9 +173,17 @@ export function QrPage({
       setLinks(data.links);
       setTotal(data.total);
       setError("");
-      setSelected((prev) =>
-        prev ? data.links.find((link) => link.id === prev.id) || null : null,
-      );
+      setSelected((prev) => {
+        if (!prev) return null;
+        const updated = data.links.find((link) => link.id === prev.id);
+        if (updated) {
+          if (createdSelection.current === prev.id)
+            createdSelection.current = null;
+          return updated;
+        }
+        // A creation can reach the detail before a replica/list sees the row.
+        return createdSelection.current === prev.id ? prev : null;
+      });
     } catch (e) {
       if (current()) setError(errorText(e));
     } finally {
@@ -147,30 +203,33 @@ export function QrPage({
     return () => clearInterval(timer);
   }, [refresh]);
   useEffect(() => {
+    setLogoDraft(null);
+    setLogoError("");
+  }, [selected?.id]);
+  useEffect(() => {
     let alive = true;
-    setQr("");
+    setQrImage(null);
     setQrError("");
     if (selected) {
-      QRCode.toDataURL(trackingUrl(selected.code, "qr"), {
-        width: 640,
-        margin: 4,
-        errorCorrectionLevel: "M",
-      })
+      qrImageWithStoreNameDataUrl(
+        trackingUrl(selected.code, "qr"),
+        selected.logo_id ?? null,
+        import.meta.env.BASE_URL,
+        selected.store_name ?? null,
+      )
         .then((value) => {
-          if (alive) setQr(value);
+          if (alive) setQrImage({ key: qrKey, url: value });
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (alive) {
-            setQrError(
-              "QR画像を生成できませんでした。別のリンクを選ぶか画面を開き直してください。",
-            );
+            setQrError(`QR画像を生成できませんでした。${errorText(error)}`);
           }
         });
     }
     return () => {
       alive = false;
     };
-  }, [selected?.code]);
+  }, [selected?.code, selected?.logo_id, selected?.store_name]);
   useEffect(() => {
     let alive = true;
     setHistory(null);
@@ -198,12 +257,32 @@ export function QrPage({
   }, [selected?.id, historyPage, detailRefreshKey]);
   async function create(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
-    const fields = { title: title.trim(), targetUrl: url.trim() };
+    if (busy || filePending) return;
+    let storeName: string | null;
+    try {
+      storeName = QR_LOGOS.some(
+        (logo) => logo.id === creationLogoId && logo.kind === "store",
+      )
+        ? validateStoreName(creationStoreName)
+        : null;
+    } catch {
+      setError(
+        "店舗名は80文字以内で入力してください。改行・制御文字は使えません。",
+      );
+      return;
+    }
+    const fields = {
+      title: title.trim(),
+      targetUrl: url.trim(),
+      logoId: creationLogoId,
+      storeName,
+    };
     if (
       !createRequest.current ||
       createRequest.current.title !== fields.title ||
-      createRequest.current.targetUrl !== fields.targetUrl
+      createRequest.current.targetUrl !== fields.targetUrl ||
+      createRequest.current.logoId !== fields.logoId ||
+      createRequest.current.storeName !== fields.storeName
     ) {
       createRequest.current = { id: crypto.randomUUID(), ...fields };
     }
@@ -216,8 +295,12 @@ export function QrPage({
       });
       if (!mounted.current) return;
       createRequest.current = null;
+      ++listRequest.current;
+      createdSelection.current = link.id;
       setTitle("");
       setUrl("");
+      setCreationLogoId(null);
+      setCreationStoreName(null);
       setSelected(link);
       setHistoryPage(0);
       setPage(0);
@@ -234,12 +317,68 @@ export function QrPage({
     source: "qr" | "button" | "link" = "button",
   ) {
     try {
-      await navigator.clipboard.writeText(trackingUrl(link.code, source));
+      await navigator.clipboard.writeText(
+        copiedShareUrl(link.code, source, link.file_mime),
+      );
       notify("計測用URLをコピーしました。");
     } catch {
       notify(
         "コピーできませんでした。表示されたURLを選択してコピーしてください。",
       );
+    }
+  }
+  async function saveLogo() {
+    if (busy || !selected || !logoChanged) return;
+    const link = selected;
+    const logoId = draftLogoId;
+    let storeName: string | null;
+    try {
+      storeName = QR_LOGOS.some(
+        (logo) => logo.id === logoId && logo.kind === "store",
+      )
+        ? validateStoreName(draftStoreName)
+        : null;
+    } catch {
+      setLogoError(
+        "店舗名は80文字以内で入力してください。改行・制御文字は使えません。",
+      );
+      return;
+    }
+    setBusy(true);
+    setSavingLogo(true);
+    setLogoError("");
+    try {
+      const updated = await qrApi<QrLink>(`/links/${link.id}/logo`, {
+        method: "PATCH",
+        body: JSON.stringify({ logoId, storeName }),
+      });
+      if (!mounted.current) return;
+      if (
+        updated.id !== link.id ||
+        updated.code !== link.code ||
+        updated.logo_id !== logoId ||
+        validateStoreName(updated.store_name) !== storeName
+      ) {
+        throw new Error(
+          "ロゴ・店舗名の保存結果を確認できませんでした。一覧を更新して確認し、必要に応じて再試行してください。",
+        );
+      }
+      // Any list started before this write may still contain the old logo.
+      ++listRequest.current;
+      setLinks((previous) =>
+        previous.map((row) => (row.id === link.id ? updated : row)),
+      );
+      setSelected((previous) =>
+        previous?.id === link.id ? updated : previous,
+      );
+      if (selectedId.current === link.id) setLogoDraft(null);
+      notify("QRのロゴ・店舗名を保存しました。");
+    } catch (e) {
+      if (mounted.current && selectedId.current === link.id)
+        setLogoError(errorText(e));
+    } finally {
+      setSavingLogo(false);
+      setBusy(false);
     }
   }
   async function toggle(link: QrLink) {
@@ -382,7 +521,7 @@ export function QrPage({
                 role="tablist"
                 aria-label="QRコードの作成方法"
                 onKeyDown={(event) => {
-                  if (busy) return;
+                  if (busy || filePending) return;
                   const tabs = Array.from(
                     event.currentTarget.querySelectorAll<HTMLButtonElement>(
                       '[role="tab"]',
@@ -414,7 +553,7 @@ export function QrPage({
                   aria-selected={createMode === "file"}
                   aria-controls="qr-create-file-panel"
                   tabIndex={createMode === "file" ? 0 : -1}
-                  disabled={busy}
+                  disabled={busy || filePending}
                   onClick={() => setCreateMode("file")}
                 >
                   ファイルから作成
@@ -426,7 +565,7 @@ export function QrPage({
                   aria-selected={createMode === "link"}
                   aria-controls="qr-create-link-panel"
                   tabIndex={createMode === "link" ? 0 : -1}
-                  disabled={busy}
+                  disabled={busy || filePending}
                   onClick={() => setCreateMode("link")}
                 >
                   URLから作成
@@ -441,8 +580,17 @@ export function QrPage({
                 <QrFileUpload
                   busy={busy}
                   onBusy={setBusy}
+                  onPendingChange={setFilePending}
+                  logoId={creationLogoId}
+                  storeName={creationStoreName}
+                  onStoreNameChange={setCreationStoreName}
+                  onLogoChange={chooseCreationLogo}
                   onCreated={(link) => {
                     if (!mounted.current) return;
+                    ++listRequest.current;
+                    createdSelection.current = link.id;
+                    setCreationLogoId(null);
+                    setCreationStoreName(null);
                     setSelected(link);
                     setHistoryPage(0);
                     setPage(0);
@@ -466,7 +614,7 @@ export function QrPage({
                       maxLength={120}
                       placeholder="例：店頭ポスター・秋のキャンペーン"
                       required
-                      disabled={busy}
+                      disabled={busy || filePending}
                     />
                   </label>
                   <label>
@@ -478,10 +626,13 @@ export function QrPage({
                       maxLength={2048}
                       placeholder="https://example.com/"
                       required
-                      disabled={busy}
+                      disabled={busy || filePending}
                     />
                   </label>
-                  <button className="button primary" disabled={busy}>
+                  <button
+                    className="button primary"
+                    disabled={busy || filePending}
+                  >
                     {busy ? (
                       <LoaderCircle size={17} className="spin" />
                     ) : (
@@ -489,12 +640,23 @@ export function QrPage({
                     )}
                     QRコードを作成
                   </button>
+                  <QrLogoPicker
+                    value={creationLogoId}
+                    onChange={chooseCreationLogo}
+                    disabled={busy || filePending}
+                  />
+                  <QrStoreNameField
+                    logoId={creationLogoId}
+                    value={creationStoreName}
+                    onChange={setCreationStoreName}
+                    disabled={busy || filePending}
+                  />
                   <p>
                     QRには短い計測用URLが入ります。開くとアクセスを記録し、リンク先へ自動転送します。
                   </p>
                 </form>
                 <p className="qr-measure-note">
-                  QR用・ボタン用・通常リンク用のURLで経路を識別します。延べアクセスには再読み込み・直接クリック・ボットも含みます。ユニークは匿名IDによるブラウザー単位の目安で、人数や移動先の表示完了は計測しません。過去のユニーク数は復元できません。流入元が渡されない場合や以前のURLは「不明」です。端末・ブラウザーは推定です。
+                  QR用・ボタン用・通常リンク用のURLで経路を識別します。主指標の延べアクセスには再読み込み・直接クリック・ボットも含みます。人数・スマホの台数・移動先の表示完了は計測しません。ブラウザー単位の数値は匿名IDによる参考値です。同じスマホでもコードスキャナーなどでIDが引き継がれないと別件になり、過去の参考値も復元できません。流入元が渡されない場合や以前のURLは「不明」です。端末・ブラウザーの分類は推定です。
                 </p>
               </div>
             </>
@@ -536,6 +698,7 @@ export function QrPage({
                     type="button"
                     className="icon-button"
                     aria-label="QR詳細を閉じる"
+                    disabled={busy}
                     onClick={() => setSelected(null)}
                   >
                     <X size={18} />
@@ -550,12 +713,61 @@ export function QrPage({
                   {selected.scan_count.toLocaleString()}
                   <small>回のアクセス</small>
                 </p>
+                <div className="qr-logo-editor">
+                  <QrLogoPicker
+                    label="登録済みQRのロゴ"
+                    value={draftLogoId}
+                    disabled={busy}
+                    onChange={(logoId) => {
+                      if (busy || logoId === draftLogoId) return;
+                      setLogoDraft({
+                        id: selected.id,
+                        logoId,
+                        storeName: null,
+                      });
+                      setLogoError("");
+                    }}
+                  />
+                  <QrStoreNameField
+                    label="登録済みQRの店舗名"
+                    logoId={draftLogoId}
+                    value={draftStoreName}
+                    disabled={busy}
+                    onChange={(storeName) => {
+                      if (busy) return;
+                      setLogoDraft({
+                        id: selected.id,
+                        logoId: draftLogoId,
+                        storeName,
+                      });
+                      setLogoError("");
+                    }}
+                  />
+                  <p className="qr-analysis-meta">
+                    保存すると同じ店舗の利用者にも反映され、再表示・PNG保存に使われます。短縮URL・アクセス数・履歴は変わりません。配布済みの画像は自動では変わらないため、必要に応じてPNGを保存し直してください。
+                  </p>
+                  {logoError && (
+                    <p className="error-message" role="alert">
+                      {logoError}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy || !logoChanged}
+                    aria-busy={savingLogo}
+                    onClick={saveLogo}
+                  >
+                    {savingLogo && <LoaderCircle size={16} className="spin" />}
+                    ロゴを保存
+                  </button>
+                </div>
                 <label>
                   ボタン用の短縮URL
                   <div className="qr-copy-row">
                     <input
                       readOnly
-                      value={trackingUrl(selected.code, "button")}
+                      value={copiedShareUrl(selected.code, "button", selected.file_mime)}
                       onFocus={(e) => e.target.select()}
                     />
                     <button
@@ -573,7 +785,7 @@ export function QrPage({
                   <div className="qr-copy-row">
                     <input
                       readOnly
-                      value={trackingUrl(selected.code, "qr")}
+                      value={copiedShareUrl(selected.code, "qr", selected.file_mime)}
                       onFocus={(e) => e.target.select()}
                     />
                     <button
@@ -600,7 +812,7 @@ export function QrPage({
                       try {
                         await navigator.clipboard.writeText(
                           buttonHtml(
-                            trackingUrl(selected.code, "button"),
+                            copiedShareUrl(selected.code, "button", selected.file_mime),
                             selected.title,
                           ),
                         );

@@ -6,7 +6,6 @@ import {
   LockKeyhole,
   ShieldCheck,
   QrCode,
-  Check,
 } from "lucide-react";
 import {
   isCloud,
@@ -48,8 +47,11 @@ export function AuthGate({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [identity, setIdentity] = useState<string | null>(null);
+  const [otherLoginOpen, setOtherLoginOpen] = useState(() =>
+    isAccountNavigation(location.search, location.hash),
+  );
   useEffect(() => {
-    if (!portalGoogleAuthEnabled || !isCloud) return;
+    if (!isCloud) return;
     let alive = true;
     const sync = (id: string | null) => {
       if (!alive) return;
@@ -149,7 +151,10 @@ export function AuthGate({
       setBusy(false);
     }
   }
-  if (application && (application === "qr" || !isCloud || session))
+  if (
+    application &&
+    (!isCloud || session || (application === "qr" && identity))
+  )
     return (
       <>
         {children(application, () => {
@@ -195,14 +200,14 @@ export function AuthGate({
           <span className="login-lock">
             <LockKeyhole size={25} />
           </span>
-          <h2>このページで開く</h2>
+          <h2>{session ? "アプリを開く" : "ログイン"}</h2>
           <p>
             {session
-              ? "会議録にログイン済みです。QRの利用権限は別途確認します。"
-              : "アプリを選んでログインしてください。QRは個人のメールアドレスで利用します。"}
+              ? "開くアプリを選んでください。"
+              : "kotonohaとMARUGO QRは同じID・パスワードで入れます。"}
           </p>
-          <fieldset className="application-options" disabled={busy}>
-            <legend>利用するアプリ</legend>
+          <fieldset className="application-options compact" disabled={busy}>
+            <legend>開くアプリ</legend>
             {(
               [
                 {
@@ -238,78 +243,88 @@ export function AuthGate({
                   <strong>{name}</strong>
                   <small>{note}</small>
                 </span>
-                {selectedApplication === id && (
-                  <Check size={20} aria-hidden="true" />
-                )}
               </label>
             ))}
           </fieldset>
-          {portalGoogleAuthEnabled && isCloud && (
-            <PortalGoogleAccess
-              application={selectedApplication}
-              onOpen={() => setApplication("kotonoha")}
-              onBusy={setBusy}
-              onIdentity={setIdentity}
-            />
-          )}
-          {selectedApplication === "qr" ? (
-            <QrAccountAccess
-              onAuthenticated={() => setApplication("qr")}
-              onBusy={setBusy}
-              sharedGoogle={portalGoogleAuthEnabled}
-            />
-          ) : (
-            <form onSubmit={login}>
-              {isCloud && !session && (
-                <>
-                  <label className="field">
-                    ログインID
-                    <input
-                      type="text"
-                      autoComplete="username"
-                      value={loginId}
-                      onChange={(e) => setLoginId(e.target.value)}
-                      autoCapitalize="none"
-                      spellCheck={false}
-                      required
-                      placeholder="ログインIDを入力"
-                    />
-                  </label>
-                  <label className="field">
-                    パスワード
-                    <input
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </label>
-                </>
-              )}
-              {error && (
-                <div className="error-message" role="alert">
-                  {error}
-                </div>
-              )}
-              <button className="button primary" disabled={busy}>
-                {busy ? (
-                  <LoaderCircle size={17} className="spin" />
-                ) : (
-                  <ArrowRight size={17} />
-                )}
-                {busy
-                  ? "ログインしています…"
-                  : `kotonoha${session || !isCloud ? "を開く" : "にログイン"}`}
-              </button>
-              <div className="login-account-note">
-                <ShieldCheck size={17} />
-                <p>
-                  kotonohaはこれまでの共通IDも利用できます。Googleでの利用には本人連携と管理者承認が必要です。QRは個人アカウント・店舗別の管理です。共用端末では利用後にログアウトしてください。
-                </p>
+          <form onSubmit={login}>
+            {isCloud && !session && (
+              <>
+                <label className="field">
+                  ログインID
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    disabled={busy}
+                    placeholder="ログインIDを入力"
+                  />
+                </label>
+                <label className="field">
+                  パスワード
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={busy}
+                  />
+                </label>
+              </>
+            )}
+            {error && (
+              <div className="error-message" role="alert">
+                {error}
               </div>
-            </form>
-          )}
+            )}
+            <button className="button primary" disabled={busy}>
+              {busy ? (
+                <LoaderCircle size={17} className="spin" />
+              ) : (
+                <ArrowRight size={17} />
+              )}
+              {busy
+                ? "ログインしています…"
+                : session || !isCloud
+                  ? `${selectedApplication === "qr" ? "MARUGO QR" : "kotonoha"}を開く`
+                  : "ログインして開く"}
+            </button>
+            <div className="login-account-note">
+              <ShieldCheck size={17} />
+              <p>共用端末では、使い終わったらログアウトしてください。</p>
+            </div>
+          </form>
+          {isCloud &&
+            (portalGoogleAuthEnabled || selectedApplication === "qr") && (
+              <details
+                className="login-secondary"
+                open={otherLoginOpen}
+                onToggle={(event) =>
+                  setOtherLoginOpen(event.currentTarget.open)
+                }
+              >
+                <summary>別の方法でログイン</summary>
+                {portalGoogleAuthEnabled && (
+                  <PortalGoogleAccess
+                    application={selectedApplication}
+                    onOpen={() => setApplication(selectedApplication)}
+                    onBusy={setBusy}
+                    onIdentity={setIdentity}
+                  />
+                )}
+                {selectedApplication === "qr" && (
+                  <QrAccountAccess
+                    onAuthenticated={() => setApplication("qr")}
+                    onBusy={setBusy}
+                    sharedGoogle={portalGoogleAuthEnabled}
+                  />
+                )}
+              </details>
+            )}
         </div>
       </section>
     </div>

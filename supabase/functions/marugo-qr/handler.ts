@@ -1,5 +1,11 @@
+import { storeNamePayload } from "../_shared/qr-store-name.mjs";
 import { AccountError, qrScope } from "../_shared/qr-account-auth.ts";
 import { validVisitorId, visitorHash } from "../_shared/qr-visitor.mjs";
+import {
+  QR_LOGO_CATALOG_HEADER,
+  supportsQrLogoPayload,
+  validateLogoId,
+} from "../_shared/qr-logos.mjs";
 import {
   FileError,
   publicFile,
@@ -12,9 +18,14 @@ import {
   accessDevice,
   QR_SOURCES,
 } from "../_shared/qr-attribution.mjs";
+import {
+  cardHtml,
+} from "../_shared/qr-card.mjs";
 
 const origins = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://127.0.0.1:5188",
   "http://localhost:5188",
 ]);
@@ -58,12 +69,15 @@ export function normalizeTarget(value: unknown): string {
     );
   }
   if (
-    url.hostname === "marugo-s.github.io" &&
-    (["/multiapp/marugo", "/OEM/marugo"].includes(
-      url.pathname.replace(/\/$/, ""),
-    ) ||
-      (["/multiapp", "/OEM"].includes(url.pathname.replace(/\/$/, "")) &&
-        url.hash.length > 1))
+    (url.hostname === "marugo-s.github.io" &&
+      (["/multiapp/marugo", "/OEM/marugo"].includes(
+        url.pathname.replace(/\/$/, ""),
+      ) ||
+        (["/multiapp", "/OEM"].includes(url.pathname.replace(/\/$/, "")) &&
+          url.hash.length > 1))) ||
+    (["marugo-waltz.com", "www.marugo-waltz.com"].includes(url.hostname) &&
+      (url.pathname.replace(/\/$/, "") === "/marugo" ||
+        (url.pathname === "/" && url.hash.length > 1)))
   ) {
     throw new ApiError(
       400,
@@ -119,6 +133,9 @@ async function rpc(name: string, args: unknown) {
   });
   const data = await response.json();
   if (!response.ok) {
+    if (
+      data.message === "INVALID_LOGO" || data.message === "INVALID_STORE_NAME"
+    ) throw new Error(data.message);
     if (data.message === "NOT_FOUND") {
       throw new ApiError(404, "このQRコードは見つかりません。");
     }
@@ -173,15 +190,30 @@ export async function handler(req: Request): Promise<Response> {
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
     Vary: "Origin",
-    "Access-Control-Allow-Headers": "authorization,apikey,content-type",
+    "Access-Control-Allow-Headers": `authorization,apikey,content-type,${QR_LOGO_CATALOG_HEADER}`,
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
   };
   if (origin && origins.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
   }
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data), { status, headers });
-  if (origin && !origins.has(origin)) {
+  let checkCatalog = false;
+  const json = (data: unknown, status = 200) => {
+    if (
+      checkCatalog &&
+      status >= 200 &&
+      status < 300 &&
+      !supportsQrLogoPayload(data, req.headers.get(QR_LOGO_CATALOG_HEADER))
+    ) {
+      data = {
+        code: "QR_CATALOG_UPDATE_REQUIRED",
+        error:
+          "この画面では新しいロゴを表示できません。入力内容を控えてから画面を更新してください。直前の操作は保存済みの可能性があります。更新後に一覧を確認してください。",
+      };
+      status = 409;
+    }
+    return new Response(JSON.stringify(data), { status, headers });
+  };
+  if (origin && !origins.has(origin) && !new URL(req.url).pathname.includes("/card/")) {
     return json({ error: "アクセス元が許可されていません。" }, 403);
   }
   if (req.method === "OPTIONS") {
@@ -193,6 +225,28 @@ export async function handler(req: Request): Promise<Response> {
     const index = url.pathname.indexOf(prefix);
     if (index < 0) return json({ error: "ページが見つかりません。" }, 404);
     const route = url.pathname.slice(index + prefix.length);
+    const cardRoute = route.match(/^\/card\/([A-Za-z0-9_-]{12})$/);
+    if (cardRoute && req.method === "GET") {
+      let name = "公開リンク";
+      try {
+        const card = await rpc("kotonoha_qr_card", { p_code: cardRoute[1] });
+        if (card && typeof card.name === "string" && card.name.trim()) name = card.name;
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 404) throw error;
+      }
+      return new Response(cardHtml(name, cardRoute[1]), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "no-referrer",
+        },
+      });
+    }
+    if (route === "/html-cards" && req.method === "GET") {
+      return json(await rpc("kotonoha_qr_html_cards", {}));
+    }
     const fileRoute = route.match(/^\/files\/([A-Za-z0-9_-]{12})$/);
     if (fileRoute && req.method === "GET")
       return json(await publicFile(fileRoute[1], rpc));
@@ -239,9 +293,10 @@ export async function handler(req: Request): Promise<Response> {
       });
       return json({ targetUrl: normalizeTarget(data.targetUrl) });
     }
-    // Auth verifies the JWT remotely; DB derives the allowed store, not the body.
-    // Legacy shared credentials never authorize store management.
+    // Native Auth or the enabled shared session is verified server-side.
+    // The database derives the allowed store, never a workspace in the body.
     const session = await qrScope(req, url);
+    checkCatalog = true;
     const args = { p_owner: session.workspaceId };
     if (route === "/uploads" && req.method === "POST") {
       const input = await body(req);
@@ -273,13 +328,29 @@ export async function handler(req: Request): Promise<Response> {
       if (view !== "active" && view !== "trash") {
         throw new ApiError(400, "一覧の指定が正しくありません。");
       }
-      return json(
-        await rpc("kotonoha_qr", {
-          ...args,
-          p_operation: view === "trash" ? "trash_list" : "list",
-          p_payload: { page },
-        }),
-      );
+      const listed = await rpc("kotonoha_qr", {
+        ...args,
+        p_operation: view === "trash" ? "trash_list" : "list",
+        p_payload: { page },
+      });
+      if (
+        view === "active" &&
+        url.searchParams.get("kinds") === "1" &&
+        listed &&
+        Array.isArray(listed.links)
+      ) {
+        const kinds = await rpc("kotonoha_qr_file_kinds", {
+          p_owner: session.workspaceId,
+        });
+        const mimeByCode = new Map(
+          (Array.isArray(kinds) ? kinds : []).map((item: { code: string; mime: string }) => [item.code, item.mime]),
+        );
+        listed.links = listed.links.map((link: { code: string }) => ({
+          ...link,
+          file_mime: mimeByCode.get(link.code) ?? null,
+        }));
+      }
+      return json(listed);
     }
     if (route === "/links" && req.method === "POST") {
       const input = await body(req);
@@ -306,15 +377,34 @@ export async function handler(req: Request): Promise<Response> {
             code,
             title: input.title.trim(),
             targetUrl: normalizeTarget(input.targetUrl),
+            logoId: validateLogoId(input.logoId),
+            ...storeNamePayload(input),
           },
         }),
         201,
       );
     }
     const match = route.match(
-      /^\/links\/([^/]+)(\/history|\/analytics|\/trash|\/restore)?$/,
+      /^\/links\/([^/]+)(\/history|\/analytics|\/trash|\/restore|\/logo)?$/,
     );
     if (match && uuid.test(match[1])) {
+      if (match[2] === "/logo" && req.method === "PATCH") {
+        const input = await body(req);
+        if (!Object.hasOwn(input, "logoId")) {
+          throw new ApiError(400, "ロゴの指定が必要です。");
+        }
+        return json(
+          await rpc("kotonoha_qr", {
+            ...args,
+            p_operation: "logo",
+            p_id: match[1],
+            p_payload: {
+              logoId: validateLogoId(input.logoId),
+              ...storeNamePayload(input),
+            },
+          }),
+        );
+      }
       if (
         (match[2] === "/trash" || match[2] === "/restore") &&
         req.method === "POST"
@@ -389,6 +479,15 @@ export async function handler(req: Request): Promise<Response> {
     }
     return json({ error: "ページが見つかりません。" }, 404);
   } catch (error) {
+    if (error instanceof Error && error.message === "INVALID_STORE_NAME") {
+      return json(
+        { error: "店舗名は80文字以内の1行で入力してください。" },
+        400,
+      );
+    }
+    if (error instanceof Error && error.message === "INVALID_LOGO") {
+      return json({ error: "ロゴの指定が正しくありません。" }, 400);
+    }
     if (
       error instanceof ApiError ||
       error instanceof FileError ||

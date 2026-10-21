@@ -2,10 +2,14 @@ import {
   AccountError,
   accountRpc,
   qrIdentity,
+  qrSharedTokenHash,
+  sharedAccountRpc,
   uuidPattern,
 } from "../_shared/qr-account-auth.ts";
 const origins = new Set([
   "https://marugo-s.github.io",
+  "https://marugo-waltz.com",
+  "https://www.marugo-waltz.com",
   "http://localhost:5188",
   "http://127.0.0.1:5188",
 ]);
@@ -64,14 +68,24 @@ export async function handler(req: Request): Promise<Response> {
     const route = match[1] || "";
     if (route === "/stores" && req.method === "GET")
       return json(await accountRpc("stores_public"));
-    const actor = await qrIdentity(req);
+    const sharedHash = await qrSharedTokenHash(req);
+    const actor = sharedHash ? null : await qrIdentity(req);
+    const authorizedRpc = (
+      operation: string,
+      store: string | null = null,
+      target: string | null = null,
+      payload: unknown = {},
+    ) =>
+      sharedHash
+        ? sharedAccountRpc(operation, sharedHash, store, target, payload)
+        : accountRpc(operation, actor, store, target, payload);
     if (route === "/context" && req.method === "GET")
-      return json(await accountRpc("context", actor));
+      return json(await authorizedRpc("context"));
     if (route === "/register" && req.method === "POST") {
       const input = await body(req);
       if (typeof input.storeId !== "string" || !uuidPattern.test(input.storeId))
         throw new AccountError(400, "所属店舗を選んでください。");
-      return json(await accountRpc("register", actor, input.storeId));
+      return json(await authorizedRpc("register", input.storeId));
     }
     if (route === "/members" && req.method === "GET") {
       const page = Number(url.searchParams.get("page") || 0);
@@ -83,7 +97,7 @@ export async function handler(req: Request): Promise<Response> {
         (store !== null && !uuidPattern.test(store))
       )
         throw new AccountError(400, "一覧の指定が正しくありません。");
-      return json(await accountRpc("members", actor, store, null, { page }));
+      return json(await authorizedRpc("members", store, null, { page }));
     }
     const target = route.match(/^\/members\/([^/]+)$/);
     if (target && req.method === "POST") {
@@ -103,9 +117,8 @@ export async function handler(req: Request): Promise<Response> {
       )
         throw new AccountError(400, "操作内容を確認してください。");
       return json(
-        await accountRpc(
+        await authorizedRpc(
           "update_member",
-          actor,
           input.action === "assign_store" ? input.storeId : null,
           target[1],
           { action: input.action },

@@ -127,10 +127,19 @@ Deno.test(
       assert.equal(
         (
           await handler(
-            request("/uploads", "POST", { ...payload, fileName: "evil.html" }),
+            request("/uploads", "POST", { ...payload, fileName: "evil.svg" }),
           )
         ).status,
         400,
+      );
+      const html = await handler(
+        request("/uploads", "POST", { ...payload, fileName: "page.html" }),
+      );
+      assert.equal(html.status, 200);
+      assert.equal(
+        calls.find((call) => call.args.p_payload?.fileName === "page.html")
+          .args.p_payload.mime,
+        "text/html",
       );
       const prepared = await handler(
         request("/uploads", "POST", { ...payload, p_owner: "different" }),

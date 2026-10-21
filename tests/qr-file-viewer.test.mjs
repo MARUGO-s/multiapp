@@ -60,7 +60,10 @@ async function publicViewer(mime, failure = false) {
     URLSearchParams,
     AbortController,
     AbortSignal,
-    async fetch() {
+    async fetch(url) {
+      if (String(url).endsWith("/view")) {
+        return { ok: true, text: async () => "<!doctype html><p>fixture-page</p>" };
+      }
       return {
         ok: !failure,
         json: async () => ({
@@ -79,7 +82,7 @@ async function publicViewer(mime, failure = false) {
   render();
   effects[0]();
   await new Promise((resolve) => setImmediate(resolve));
-  return { tree: render(), document, Preview };
+  return { tree: render(), document, Preview, effects, render };
 }
 
 for (const mime of ["application/pdf", "image/png", "image/jpeg"]) {
@@ -102,6 +105,22 @@ for (const mime of ["application/pdf", "image/png", "image/jpeg"]) {
     }
   });
 }
+test("Public HTML renders fetched text in a unique-origin sandbox", async () => {
+  const view = await publicViewer("text/html");
+  const htmlEffect = view.effects.at(-1);
+  htmlEffect();
+  await new Promise((resolve) => setImmediate(resolve));
+  const tree = view.render();
+  const all = nodes(tree);
+  const frame = all.find((n) => n.type === "iframe");
+  assert.equal(frame.props.src, undefined);
+  assert.match(frame.props.srcDoc, /<!doctype html>/);
+  assert.equal(frame.props.referrerPolicy, "no-referrer");
+  assert.match(frame.props.sandbox, /\ballow-scripts\b/);
+  assert.doesNotMatch(frame.props.sandbox, /allow-same-origin|allow-top-navigation/);
+  assert.equal(all.some((n) => n.type === "img" || n.type === view.Preview), false);
+  assert.doesNotMatch(JSON.stringify(tree), /private-original|internal-name|download/);
+});
 test("Unavailable public file retains error and retry without exposing metadata", async () => {
   const { tree } = await publicViewer("application/pdf", true);
   const all = nodes(tree);

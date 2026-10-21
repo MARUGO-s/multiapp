@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "method": "host-reviewed-local-extraction",
+  "extractionSpecSha256": "32d7decad42d58129c6694ea4e4ce1f72a531bc5161827d2095787e9448735e9",
+  "notes": [
+    "Host LLM extraction of actual canonical documentation; no remote API or credentials. Selectors retain verbatim evidence and are re-evaluated on each update.",
+    "Section nodes refresh complete current status, test evidence, and release instructions without preserving stale prose. Missing or ambiguous anchors fail closed and require human/host review.",
+    "Code nodes and code relationships are produced by Graphify AST, not this model. Metadata entry containment is extracted literally from the JSON entries array.",
+    "Token usage for the host extraction is unavailable; Graphify placeholder zero counters are not a measurement."
+  ],
+  "sources": [
+    "docs/qr-logos.md",
+    "docs/qr-logo-assets.json",
+    "src/qr-image.mjs",
+    "supabase/functions/_shared/qr-logos.mjs"
+  ],
+  "astTargets": ["src_qr_image", "supabase_functions_shared_qr_logos"],
+  "nodes": [
+    {
+      "id": "docs_qr_logos_doc",
+      "label": "MARUGO QR 中央ロゴの選択・共有保存",
+      "file_type": "document",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "document",
+        "text": "# MARUGO QR — 中央ロゴの選択・共有保存"
+      }
+    },
+    {
+      "id": "docs_qr_logos_status",
+      "label": "MARUGO QR 実装・検証・本番反映の状態",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "## 状態" }
+    },
+    {
+      "id": "docs_qr_logos_shared_selection",
+      "label": "QRごとに共有するロゴ選択",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "選んだロゴはQRごとに保存し、同じ店舗の利用者の再表示・PNG保存にも反映する（ユーザー確認済み）。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_tracking_invariant",
+      "label": "ロゴ変更でも計測URLと履歴は不変",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "rationale": "Artwork is mutable per QR; identity, tracking URL, destination and access history are not.",
+      "selector": {
+        "kind": "quote",
+        "text": "既存QRもロゴだけ変更・解除できる。変更してもコード・計測URL・転送先・回数・アクセス履歴を変えない。配布済みPNGの見た目を遠隔で書き換える機能ではない。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_quiet_zone",
+      "label": "白いクワイエットゾーン4モジュール以上",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "シンボルの全周に4モジュール以上の白いクワイエットゾーンを確保する。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_h_codewords",
+      "label": "誤り訂正Hはコードワード復元率で面積保証ではない",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "rationale": "A codeword recovery rate cannot be used as a safe logo area or width ratio.",
+      "selector": {
+        "kind": "quote",
+        "text": "ロゴ入りは誤り訂正H。Hの約30%は**総コードワードの復元率**であり、ロゴで覆ってよい面積・幅の比率ではない。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_logo_limit",
+      "label": "承認済みSNS15点は白地込み幅22%以下（店舗拡大は別方針）",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "ロゴの外側白地を含め、中央の正方形をシンボル幅22%以下に制限する。初回プレビューの18%から、ユーザーの「もう少し大きく」に合わせて拡大した。実URLのversion 6では白地込み7→9モジュール、内側ロゴ5→7モジュールになる。これは本実装の保守的な上限であり、規格上の保証値ではない。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_reserved_cells",
+      "label": "予約パターンを保護し安全な中央がなければ拒否",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "qrcodeの予約セルを照合し、位置検出・タイミング・位置合わせ・形式・バージョン情報を上書きしない。安全な中央領域がない場合はロゴ付き生成を拒否し、「ロゴなし」を案内する。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_decode_gate",
+      "label": "jsQRで同一の計測URLを復号してからPNGを返す",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "合成後にjsQRで復号し、元の**同一の計測URL文字列**に一致した場合のみPNGを返す。読取失敗・画像読込失敗時にロゴなしへ黙って置換しない。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_physical_limits",
+      "label": "ソフト復号は端末や印刷の読み取り保証ではない",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": {
+        "kind": "quote",
+        "text": "ソフトウェアの復号成功は、スマホ撮影・汚れ・縮小印刷での読み取り保証ではない。配布前に実際の表示/印刷条件と利用端末で確認する。"
+      }
+    },
+    {
+      "id": "docs_qr_logos_assets",
+      "label": "静的PNG素材・公開範囲と未確認の利用権",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "## 素材と公開範囲" }
+    },
+    {
+      "id": "docs_qr_logos_architecture",
+      "label": "中央ロゴの実装境界と共有永続化契約",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "## 実装境界" }
+    },
+    {
+      "id": "docs_qr_logos_test_evidence",
+      "label": "実行済み検証証跡と検証範囲",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "## 検証証跡（実行済み分のみ）" }
+    },
+    {
+      "id": "docs_qr_logos_release",
+      "label": "反映手順・画面承認とロールバック",
+      "file_type": "concept",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "## 反映とロールバック" }
+    },
+    {
+      "id": "docs_qr_logos_store_policy",
+      "label": "店舗23点の安全条件内最大化・疑似finder回避",
+      "file_type": "rationale",
+      "source": "docs/qr-logos.md",
+      "selector": { "kind": "section", "text": "### 店舗23点の拡大方針" }
+    },
+    {
+      "id": "docs_qr_logo_assets_doc",
+      "label": "中央ロゴ38素材（店舗23＋SNS15）の原本とPNGハッシュ台帳",
+      "file_type": "document",
+      "source": "docs/qr-logo-assets.json",
+      "selector": { "kind": "document", "text": "\"schemaVersion\": 1" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_store_policy",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "### 店舗23点の拡大方針"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_status",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "## 状態"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_shared_selection",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "選んだロゴはQRごとに保存し、同じ店舗の利用者の再表示・PNG保存にも反映する（ユーザー確認済み）。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_tracking_invariant",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "変更してもコード・計測URL・転送先・回数・アクセス履歴を変えない。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_quiet_zone",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "シンボルの全周に4モジュール以上の白いクワイエットゾーンを確保する。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_h_codewords",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "Hの約30%は**総コードワードの復元率**であり、ロゴで覆ってよい面積・幅の比率ではない。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_logo_limit",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "中央の正方形をシンボル幅22%以下に制限する。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_reserved_cells",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "qrcodeの予約セルを照合し、位置検出・タイミング・位置合わせ・形式・バージョン情報を上書きしない。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_decode_gate",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "合成後にjsQRで復号し、元の**同一の計測URL文字列**に一致した場合のみPNGを返す。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_physical_limits",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "ソフトウェアの復号成功は、スマホ撮影・汚れ・縮小印刷での読み取り保証ではない。"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_assets",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "## 素材と公開範囲"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_architecture",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "## 実装境界"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_test_evidence",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "## 検証証跡（実行済み分のみ）"
+    },
+    {
+      "source": "docs_qr_logos_doc",
+      "target": "docs_qr_logos_release",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "## 反映とロールバック"
+    },
+    {
+      "source": "docs_qr_logos_assets",
+      "target": "docs_qr_logo_assets_doc",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "docs/qr-logo-assets.json"
+    },
+    {
+      "source": "docs_qr_logos_architecture",
+      "target": "src_qr_image",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "`src/qr-image.mjs`: QR生成、予約セルの保護、合成、復号確認。"
+    },
+    {
+      "source": "docs_qr_logos_architecture",
+      "target": "supabase_functions_shared_qr_logos",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/qr-logos.md",
+      "evidence": "`supabase/functions/_shared/qr-logos.mjs`: 固定ID・表示名・PNG名・白ロゴ用背景と厳密なID検証。"
+    }
+  ],
+  "catalog": {
+    "source": "docs/qr-logo-assets.json",
+    "documentId": "docs_qr_logo_assets_doc",
+    "nodePrefix": "docs_qr_logo_assets_"
+  }
+}

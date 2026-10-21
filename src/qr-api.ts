@@ -1,12 +1,18 @@
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./cloud";
 import { buildTrackingUrl } from "./qr-routing.mjs";
+import { htmlCardPageUrl } from "../supabase/functions/_shared/qr-card.mjs";
 import { createContext, useContext, useMemo } from "react";
-import { qrAuth } from "./qr-account-client";
+import { qrCredentials } from "./qr-account-client";
 import { scopedQrPath } from "./qr-account-routing.mjs";
+import {
+  QR_LOGO_CATALOG_HEADER,
+  QR_LOGO_CATALOG_VALUE,
+} from "../supabase/functions/_shared/qr-logos.mjs";
 
 export const QrScopeContext = createContext<{
   storeId: string;
   userId: string;
+  credentialKey?: string;
 } | null>(null);
 export function useQrApi() {
   const scope = useContext(QrScopeContext);
@@ -28,6 +34,9 @@ export type QrLink = {
   created_at: string;
   last_accessed_at: string | null;
   deleted_at: string | null;
+  logo_id?: string | null;
+  store_name?: string | null;
+  file_mime?: string | null;
 };
 export type QrHistory = {
   events: {
@@ -53,6 +62,8 @@ export type QrAnalyticsData = {
     unknownCount: number;
     botCount: number;
   }[];
+  /** Hours 0-23, Japan time. Absent from servers that predate it. */
+  hourly?: { hour: number; count: number; uniqueCount: number }[];
   periodTotal: number;
   periodUnique: number;
   totalUnique: number;
@@ -78,26 +89,38 @@ export function trackingUrl(
     source,
   );
 }
+export function copiedShareUrl(
+  code: string,
+  source: "qr" | "button" | "link" | "unknown" = "button",
+  fileMime?: string | null,
+) {
+  if (fileMime === "text/html") return htmlCardPageUrl(location.origin, code, source);
+  return trackingUrl(code, source);
+}
 export async function qrApi<T>(
   path: string,
   options: RequestInit = {},
-  scope: { storeId: string; userId: string } | null = null,
+  scope: {
+    storeId: string;
+    userId: string;
+    credentialKey?: string;
+  } | null = null,
 ): Promise<T> {
-  const {
-    data: { session },
-    error,
-  } = await qrAuth.auth.getSession();
-  if (error || !session || !scope || session.user.id !== scope.userId) {
-    throw new Error("QR管理には所属店舗のアカウントでログインしてください。");
-  }
+  if (!scope) throw new Error("ログインが必要です。");
+  const credentials = await qrCredentials();
+  if ((scope.credentialKey || scope.userId) !== credentials.identityKey)
+    throw new Error(
+      "ログイン情報が変わりました。所属店舗を確認し直してください。",
+    );
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/marugo-qr${scopedQrPath(path, scope.storeId)}`,
     {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        [QR_LOGO_CATALOG_HEADER]: QR_LOGO_CATALOG_VALUE,
         apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${session.access_token}`,
+        Authorization: `Bearer ${credentials.token}`,
       },
       signal: AbortSignal.timeout(15000),
     },

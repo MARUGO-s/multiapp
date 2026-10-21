@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./cloud";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, getSession } from "./cloud";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
 
 // One native identity client for QR + portal. Existing storage is preserved.
@@ -25,6 +25,7 @@ export type QrAccountContext = {
   member: QrMember | null;
   stores: QrStore[];
   email: string;
+  accessMode?: "shared";
 };
 export const qrGoogleAuthEnabled =
   import.meta.env.VITE_QR_GOOGLE_AUTH_ENABLED === "true";
@@ -107,11 +108,26 @@ export function finishAccountCallback() {
   })();
   return callback;
 }
-export async function qrAccessToken() {
+export async function qrCredentials() {
+  const shared = getSession();
+  if (shared && !shared.googleUserId)
+    return {
+      kind: "shared" as const,
+      token: shared.token,
+      identityKey: shared.token,
+    };
   const { data, error } = await qrAuth.auth.getSession();
-  if (error || !data.session)
-    throw new Error("QR管理にはメールアドレスでログインしてください。");
-  return data.session.access_token;
+  if (!error && data.session)
+    return {
+      kind: "account" as const,
+      token: data.session.access_token,
+      identityKey: data.session.user.id,
+      user: data.session.user,
+    };
+  throw new Error("ログインが必要です。");
+}
+export async function qrAccessToken() {
+  return (await qrCredentials()).token;
 }
 export function completeAccountRecovery() {
   callback = Promise.resolve({ recovery: false, message: "" });

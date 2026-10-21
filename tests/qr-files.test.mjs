@@ -5,15 +5,16 @@ import {
   matchesFileSignature,
   QR_FILE_MAX_BYTES,
 } from "../supabase/functions/_shared/qr-files.mjs";
-test("QR publication allows only PDF/JPEG/PNG and caps file size", () => {
+test("QR publication allows PDF/JPEG/PNG/HTML and caps file size", () => {
   assert.equal(fileSpecification("案内.PDF", 100).mime, "application/pdf");
   assert.equal(fileSpecification("写真.jpeg", 100).extension, "jpg");
   assert.equal(
     fileSpecification("写真.png", QR_FILE_MAX_BYTES).mime,
     "image/png",
   );
+  assert.equal(fileSpecification("案内.HTML", 100).mime, "text/html");
+  assert.equal(fileSpecification("page.htm", 100).extension, "html");
   for (const name of [
-    "index.html",
     "logo.svg",
     "file.psd",
     "../file.pdf",
@@ -48,4 +49,21 @@ test("QR file contents must match the extension; scripts and PSD are rejected", 
       matchesFileSignature(mime, new TextEncoder().encode("<html>8BPS")),
       false,
     );
+  for (const value of ["<!DOCTYPE html>", " <html lang=\"ja\">", "\uFEFF<html>"])
+    assert.equal(
+      matchesFileSignature("text/html", new TextEncoder().encode(value)),
+      true,
+    );
+  for (const value of ["hello", "%PDF-1.7", "<svg></svg>\u0000", ""])
+    assert.equal(
+      matchesFileSignature("text/html", new TextEncoder().encode(value)),
+      false,
+    );
+});
+test("storage may serve HTML as text/plain without accepting that type for other files", async () => {
+  const { responseMimeMatches } = await import("../supabase/functions/_shared/qr-files.mjs");
+  assert.equal(responseMimeMatches("text/html", "text/plain"), true);
+  assert.equal(responseMimeMatches("text/html", "text/html; charset=utf-8"), true);
+  assert.equal(responseMimeMatches("application/pdf", "text/plain"), false);
+  assert.equal(responseMimeMatches("text/html", "application/octet-stream"), false);
 });

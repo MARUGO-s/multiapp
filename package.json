@@ -8,7 +8,11 @@
     "build": "tsc --noEmit && vite build && node scripts/build-pdf-assets.mjs",
     "start": "node server/index.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "preview:qr-logos": "node scripts/check-qr-logo-ui.mjs",
+    "test:qr-logo-browser": "node scripts/test-qr-logo-browser.mjs && node scripts/test-qr-logo-feature-browser.mjs && node scripts/test-qr-store-browser.mjs",
+    "test:qr-caption-browser": "node scripts/test-qr-caption-browser.mjs && node scripts/test-qr-caption-ui-browser.mjs",
+    "test:qr-logo-decoding": "node scripts/check-qr-logo-decoding.mjs"
   },
   "engines": {
     "node": ">=22.18.0"
@@ -18,6 +22,7 @@
     "@supabase/supabase-js": "2.116.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "jsqr": "1.4.0",
     "lucide-react": "^0.468.0",
     "mediabunny": "1.59.0",
     "multer": "^2.0.2",
@@ -34,6 +39,8 @@
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.1",
+    "playwright": "1.64.1",
+    "pngjs": "5.0.0",
     "prettier": "^3.9.9",
     "typescript": "^5.9.3",
     "vite": "^6.4.0"
