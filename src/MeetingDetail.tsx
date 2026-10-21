@@ -40,6 +40,13 @@ import {
 import { Modal } from "./Modal";
 import { MinutesFormatField } from "./MinutesFormatField";
 import { MinutesMarkdown as Markdown } from "./MinutesMarkdown.mjs";
+import { SpeakerNamesEditor } from "./SpeakerNamesEditor";
+import {
+  applySpeakerNames,
+  recordingCount,
+  speakerKey,
+  transcriptWithNames,
+} from "./speaker-names.mjs";
 import { MINUTES_FORMATS, minutesFormat } from "../supabase/functions/_shared/minutes-formats.mjs";
 import { minutesView } from "./minutes-views.mjs";
 import { AttachmentPanel } from "./Attachments";
@@ -74,6 +81,9 @@ export function ActionList({
   const [saving, setSaving] = useState(false);
   const actions = meeting.minutes?.actions || [];
   const completedActions = meeting.completedActions || [];
+  const recordingTotal = recordingCount(meeting.transcript);
+  const ownerName = (owner: string) =>
+    applySpeakerNames(owner, meeting.speakerNames || {}, recordingTotal);
   
   // 期限切れチェック
   const isOverdue = (due: string) => {
@@ -116,6 +126,7 @@ export function ActionList({
         actions.map((action, i) => {
           const overdue = !completedActions.includes(i) && isOverdue(action.due);
           const priority = action.priority || "medium";
+          const owner = ownerName(action.owner);
           const priorityInfo = priorityConfig[priority];
           
           return (
@@ -137,9 +148,9 @@ export function ActionList({
                 <strong>{action.task}</strong>
                 <div className="action-meta">
                   <span className="person-dot">
-                    {action.owner.slice(0, 1) || "?"}
+                    {owner.slice(0, 1) || "?"}
                   </span>
-                  {action.owner || "未定"}
+                  {owner || "未定"}
                   <span className={`action-priority ${priorityInfo.className}`}>
                     {priorityInfo.label}
                   </span>
@@ -364,6 +375,26 @@ export function MeetingDetail({
   
   const displayText = tab === "transcript" ? m.transcript : view.markdown;
   const turns = m.segments.length ? null : speakerTurns(m.transcript);
+  // Speaker names are applied for display and export; the saved text keeps 話者N.
+  const speakerNames = m.speakerNames || {};
+  const recordingTotal = recordingCount(m.transcript);
+  const namedMinutes = applySpeakerNames(view.markdown, speakerNames, recordingTotal);
+  const namedTranscript = m.segments.length ? m.transcript : transcriptWithNames(m.transcript, speakerNames);
+  const copyText = tab === "transcript" ? namedTranscript : namedMinutes;
+  async function saveSpeakerNames(names: Record<string, string>) {
+    try {
+      onChange(
+        await api<Meeting>(`/meetings/${m.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ speakerNames: names }),
+        }),
+      );
+      notify("話者名を保存しました。文字起こしと議事録に反映されます。");
+    } catch (e) {
+      notify((e as Error).message);
+      throw e;
+    }
+  }
   const tabs: Tab[] = m.isDemo
     ? ["minutes", "transcript", "actions", "files"]
     : ["minutes", "transcript", "actions", "schedule", "files"];
@@ -458,11 +489,11 @@ export function MeetingDetail({
                 [
                   [
                     `議事録・${view.label}（Markdown）`,
-                    () => download(`${m.title}_${view.label}.md`, view.markdown),
+                    () => download(`${m.title}_${view.label}.md`, namedMinutes),
                   ],
                   [
                     "文字起こし（テキスト）",
-                    () => download(`${m.title}_文字起こし.txt`, m.transcript),
+                    () => download(`${m.title}_文字起こし.txt`, namedTranscript),
                   ],
                   [
                     "すべてのデータ（JSON）",
@@ -675,7 +706,7 @@ export function MeetingDetail({
                       className="button ghost small"
                       onClick={() =>
                         navigator.clipboard
-                          .writeText(displayText)
+                          .writeText(copyText)
                           .then(() => notify("コピーしました"))
                           .catch(() =>
                             notify(
@@ -752,7 +783,7 @@ export function MeetingDetail({
                   )}
                   <div role="tabpanel" id={`minutes-view-${view.format}`} aria-labelledby={view.markdown || hasAllFormats ? `minutes-format-${view.format}` : undefined}>
                 {view.markdown ? (
-                  <Markdown content={view.markdown} title={m.title} />
+                  <Markdown content={namedMinutes} title={m.title} />
                 ) : (
                   <div className="document-empty">
                     <FileText size={36} />
@@ -845,8 +876,18 @@ export function MeetingDetail({
                         {transcriptionModelName(m.transcriptionModel)}
                         が声の違いから話者を推定しています。録音が10分ごとに分割されている場合、分割した部分をまたぐと同じ人でも別の話者番号になることがあります。
                       </p>
-                      {turns.map((t, i) =>
-                        "heading" in t ? (
+                      <SpeakerNamesEditor
+                        transcript={m.transcript}
+                        names={speakerNames}
+                        disabled={processing || busy || attachmentsBusy || !!m.isDemo}
+                        onSave={saveSpeakerNames}
+                      />
+                      {(() => {
+                        let recording = 1;
+                        return turns.map((t, i) => {
+                        if ("heading" in t) recording = Number(t.heading?.match(/\d+/)?.[0] || recording);
+                        const name = t.speaker ? speakerNames[speakerKey(recording, t.speaker)] : undefined;
+                        return "heading" in t ? (
                           <h3 className="transcript-heading" key={i}>
                             {t.heading}
                           </h3>
@@ -860,9 +901,10 @@ export function MeetingDetail({
                                     3
                                   }`}
                                 >
-                                  {t.speaker.replace(/\D/g, "")}
+                                  {name ? name.slice(0, 1) : t.speaker.replace(/\D/g, "")}
                                 </span>
-                                <strong>{t.speaker}</strong>
+                                <strong>{name || t.speaker}</strong>
+                                {name && <span className="speaker-number">{t.speaker}</span>}
                                 {t.start !== null && (
                                   <span className="time-code">
                                     {clock(t.start)}
@@ -874,8 +916,9 @@ export function MeetingDetail({
                               <p key={j}>{p}</p>
                             ))}
                           </div>
-                        ),
-                      )}
+                        );
+                        });
+                      })()}
                     </>
                   ) : m.transcript ? (
                     <>
