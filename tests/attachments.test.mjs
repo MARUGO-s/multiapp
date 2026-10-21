@@ -161,6 +161,6 @@ test("実際のSDKペイロードに資料を含めず、照合schemaも要求�
       });
     },
   });
-  assert.deepEqual(await ai.summarize(meeting), parseMinutes(meeting, minutesBundle(minutes)));
+  assert.deepEqual(await ai.summarize(meeting), { ...parseMinutes(meeting, minutesBundle(minutes)), storeNameFixes: [] });
   assert.ok(called);
 });

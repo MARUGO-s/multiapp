@@ -21,7 +21,7 @@ import {
   calendarHide,
   calendarRestore,
 } from "../supabase/functions/_shared/calendar.mjs";
-import { parseMinutes } from "../supabase/functions/_shared/summary.mjs";
+import { minutesResult } from "../supabase/functions/_shared/summary.mjs";
 import {
   MAX_ATTACHMENT_SIZE,
   attachmentDigest,
@@ -326,7 +326,7 @@ export async function createApp({
           transcriptionModel: transcriptionModelForJob,
         });
       }
-      const minutes = parseMinutes(meeting, await ai.summarize(
+      const { minutes, ...transcriptFix } = minutesResult(meeting, await ai.summarize(
         meeting,
         (response) => recordApiUsage("minutes", meeting, runId, modelForJob, response, null),
       ));
@@ -334,6 +334,8 @@ export async function createApp({
         ...meeting,
         status: "done",
         minutes,
+        // Misheard store names corrected in the saved transcript, if any.
+        ...transcriptFix,
         ...minutesDocuments(meeting, minutes),
         completedActions: [],
         error: null,
