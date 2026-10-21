@@ -49,6 +49,7 @@ import {
 import {
   MAX_FILE_SIZE,
   MAX_TEXT_LENGTH,
+  MINUTES_MODELS,
   MetadataSchema,
   RetrySchema,
   PatchSchema,
@@ -59,7 +60,7 @@ import {
   transcriptFromSegments,
 } from "./domain.mjs";
 
-const models = ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"];
+const models = MINUTES_MODELS;
 const transcriptionModels = ["gpt-transcribe", "gemini-3.5-transcribe"];
 // .env files and config.json written before the GPT Transcribe upgrade; the
 // cloud migrates the same value in 20260924000200_kotonoha_gpt_transcribe.sql.
@@ -357,14 +358,14 @@ export async function createApp({
       busy.delete(id);
     }
   }
-  function startJob(id) {
+  function startJob(id, modelForJob = currentModel) {
     const meeting = getMeeting(id);
     const job = processMeeting(
       id,
       randomUUID(),
       currentKey,
       currentGeminiKey,
-      currentModel,
+      modelForJob,
       meeting.transcriptionModel || currentTranscriptionModel,
     );
     jobs.add(job);
@@ -626,7 +627,10 @@ export async function createApp({
   );
 
   app.post("/api/meetings/:id/retry", requireKey, async (req, res) => {
-    const options = RetrySchema.parse(req.body === undefined ? {} : req.body);
+    const { model: chosenModel, ...options } = RetrySchema.parse(
+      req.body === undefined ? {} : req.body,
+    );
+    const modelForRetry = chosenModel || currentModel;
     const meeting = getMeeting(req.params.id);
     if (meeting.status === "uploading")
       throw fail(
@@ -653,12 +657,12 @@ export async function createApp({
         error: null,
         geminiRetryCount: 0,
         transcriptionWait: null,
-        minutesModel: currentModel,
+        minutesModel: modelForRetry,
         ...(needsTranscription(meeting)
           ? { transcriptionModel: currentTranscriptionModel }
           : {}),
       });
-      startJob(meeting.id);
+      startJob(meeting.id, modelForRetry);
       res.status(202).json(publicRecord(next));
     } catch (error) {
       busy.delete(meeting.id);

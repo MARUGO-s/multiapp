@@ -257,6 +257,10 @@ export function publicRecordings(parts) {
     ...(part.transcriptionFallback
       ? { fallbackModel: part.transcriptionFallback.model }
       : {}),
+    // Lets the browser join the split parts back into each selected recording.
+    ...(Number.isInteger(part.sourceIndex)
+      ? { sourceIndex: part.sourceIndex }
+      : {}),
   }));
 }
 

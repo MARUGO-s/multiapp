@@ -65,6 +65,52 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
   assert.equal(seen.length, 3);
 });
 
+test("再生成時に解析モデルを選べ、接続設定のモデルは変更しない", async (t) => {
+  const models = [];
+  const { request, store, waitForJobs } = await setup(t, {
+    apiKey: key,
+    aiFactory: (_key, model) => ({
+      async transcribe() { throw new Error("再文字起こし不要"); },
+      async summarize(_meeting, onUsage) {
+        models.push(model);
+        await onUsage({ id: `resp-${models.length}`, usage: { input_tokens: 10, output_tokens: 5 } });
+        return { ...sampleMinutes, summary: `再生成：${model}` };
+      },
+    }),
+  });
+  const meeting = { ...createDemo(), isDemo: false, source: "audio", audioFile: "already.wav", transcript: "保存済みの会話", minutesModel: "gpt-6-astra" };
+  await store.save(meeting);
+  const route = `/meetings/${meeting.id}/retry`;
+  const response = await request(route, { method: "POST", body: JSON.stringify({ template: "brief", model: "gpt-6-luna" }) });
+  assert.equal(response.status, 202);
+  assert.equal((await response.json()).minutesModel, "gpt-6-luna");
+  await waitForJobs();
+  const saved = store.get(meeting.id);
+  assert.equal(saved.status, "done");
+  assert.equal(saved.minutesModel, "gpt-6-luna");
+  assert.equal(saved.template, "brief");
+  assert.equal(saved.model, undefined, "the choice is not stored as a meeting field");
+  assert.match(saved.markdown, /再生成：gpt-6-luna/);
+  assert.equal((await (await request("/settings")).json()).model, "gpt-6-astra");
+  const month = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit",
+  }).format(new Date());
+  const usage = await (await request(`/usage?month=${month}&page=0`)).json();
+  assert.ok(usage.events.some((event) =>
+    event.meetingId === meeting.id && event.kind === "minutes" && event.model === "gpt-6-luna"));
+  // Without a model (older clients, error retry) the connection settings' model is used.
+  assert.equal((await request(route, { method: "POST" })).status, 202);
+  await waitForJobs();
+  assert.equal(store.get(meeting.id).minutesModel, "gpt-6-astra");
+  assert.deepEqual(models, ["gpt-6-luna", "gpt-6-astra"]);
+  const before = structuredClone(store.get(meeting.id));
+  for (const body of ['{"model":"gpt-4o"}', '{"model":null}', '{"model":""}']) {
+    assert.equal((await request(route, { method: "POST", body })).status, 400);
+    assert.deepEqual(store.get(meeting.id), before);
+  }
+  assert.equal(models.length, 2);
+});
+
 test("会議一覧と詳細で分割録音の合計時間を返し、内部音声情報は公開しない", async (t) => {
   const { request, store } = await setup(t);
   const meeting = { ...createDemo(), duration: null, uploadPlan: [{}, {}], audioParts: [{ duration: 600 }, { duration: 33.626122 }] };

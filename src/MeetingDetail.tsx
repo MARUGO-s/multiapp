@@ -22,10 +22,17 @@ import {
 } from "lucide-react";
 import { meetingEvents } from "../supabase/functions/_shared/calendar.mjs";
 import { BotStatus } from "./BotStatus";
-import { api, download, audioUrl } from "./api";
+import { api, download, audioBlob, audioUrl } from "./api";
+import { joinRecordings } from "./split-recordings.mjs";
+import {
+  audioFileName,
+  recordingFiles,
+  savedAudioExtension,
+} from "./recording-files.mjs";
 import {
   clock,
   isWorking,
+  minutesModels,
   modelName,
   transcriptionModelName,
   type Meeting,
@@ -212,6 +219,7 @@ export function MeetingDetail({
   onDelete,
   notify,
   onEditingChange,
+  settingsModel,
 }: {
   meeting: Meeting;
   onBack: () => void;
@@ -223,6 +231,8 @@ export function MeetingDetail({
   onDelete: (id: string) => void;
   notify: (s: string) => void;
   onEditingChange: (value: boolean) => void;
+  /** The connection settings' minutes model, used when the meeting has none. */
+  settingsModel?: string;
 }) {
   const [tab, setTab] = useState<Tab>("minutes");
   const [dropped, setDropped] = useState<{ files: File[]; id: number } | null>(
@@ -235,9 +245,15 @@ export function MeetingDetail({
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<"delete" | "regenerate" | null>(null);
   const [retryTemplate, setRetryTemplate] = useState<Meeting["template"]>(m.template);
+  const meetingModel =
+    [m.minutesModel, settingsModel].find(
+      (id): id is string => !!id && minutesModels.includes(id),
+    ) || "gpt-6-astra";
+  const [retryModel, setRetryModel] = useState(meetingModel);
   const audio = useRef<HTMLAudioElement>(null);
   const [audioSource, setAudioSource] = useState("");
   const [audioPart, setAudioPart] = useState(0);
+  const [audioSaving, setAudioSaving] = useState("");
   const [now, setNow] = useState(Date.now());
   const wait = m.status === "transcribing" ? m.transcriptionWait : null;
   const waitSeconds = wait
@@ -253,6 +269,9 @@ export function MeetingDetail({
   const recordings = m.recordings?.length
     ? m.recordings
     : [{ fileName: m.fileName || "録音", transcribed: Boolean(m.transcript) }];
+  const audioFiles: { name: string; parts: number[] }[] =
+    m.hasAudio && m.status !== "uploading" ? recordingFiles(recordings) : [];
+  const playingFile = audioFiles.find((file) => file.parts.includes(audioPart));
   useEffect(() => {
     // On narrow screens the tab row scrolls; keep the selected tab visible.
     document
@@ -317,7 +336,10 @@ export function MeetingDetail({
       onChange(
         await api<Meeting>(`/meetings/${m.id}/retry`, {
           method: "POST",
-          body: confirm === "regenerate" ? JSON.stringify({ template: retryTemplate }) : undefined,
+          body:
+            confirm === "regenerate"
+              ? JSON.stringify({ template: retryTemplate, model: retryModel })
+              : undefined,
         }),
       );
       setConfirm(null);
@@ -325,6 +347,34 @@ export function MeetingDetail({
       notify((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+  async function saveAudio(file: { name: string; parts: number[] }) {
+    if (audioSaving) return;
+    setAudioSaving("音声を準備中…");
+    try {
+      const blobs: Blob[] = [];
+      for (const [n, part] of file.parts.entries()) {
+        if (file.parts.length > 1)
+          setAudioSaving(`音声を準備中 ${n + 1}/${file.parts.length}`);
+        blobs.push(await audioBlob(m.id, part));
+      }
+      const saved =
+        blobs.length > 1
+          ? await joinRecordings(blobs)
+          : {
+              blob: blobs[0],
+              extension: savedAudioExtension(blobs[0].type, file.name),
+            };
+      download(
+        audioFileName(file.name, saved.extension),
+        saved.blob,
+        saved.blob.type || "application/octet-stream",
+      );
+    } catch (e) {
+      notify(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAudioSaving("");
     }
   }
   async function remove() {
@@ -419,34 +469,47 @@ export function MeetingDetail({
               <ChevronDown size={13} />
             </summary>
             <div>
-              {[
+              {(
                 [
-                  "議事録（Markdown）",
-                  () => download(`${m.title}.md`, m.markdown),
-                ],
-                [
-                  "文字起こし（テキスト）",
-                  () => download(`${m.title}_文字起こし.txt`, m.transcript),
-                ],
-                [
-                  "すべてのデータ（JSON）",
-                  () =>
-                    download(
-                      `${m.title}.json`,
-                      JSON.stringify(m, null, 2),
-                      "application/json",
-                    ),
-                ],
-                ["印刷・PDFに保存", () => window.print()],
-              ].map(([label, run]) => (
+                  [
+                    "議事録（Markdown）",
+                    () => download(`${m.title}.md`, m.markdown),
+                  ],
+                  [
+                    "文字起こし（テキスト）",
+                    () => download(`${m.title}_文字起こし.txt`, m.transcript),
+                  ],
+                  [
+                    "すべてのデータ（JSON）",
+                    () =>
+                      download(
+                        `${m.title}.json`,
+                        JSON.stringify(m, null, 2),
+                        "application/json",
+                      ),
+                  ],
+                  ...audioFiles.map(
+                    (file, i) =>
+                      [
+                        audioFiles.length > 1
+                          ? `音声ファイル（${i + 1}. ${file.name}）`
+                          : "音声ファイル",
+                        () => void saveAudio(file),
+                        true,
+                      ] as const,
+                  ),
+                  ["印刷・PDFに保存", () => window.print()],
+                ] as (readonly [string, () => void, boolean?])[]
+              ).map(([label, run, audioItem]) => (
                 <button
-                  key={label as string}
+                  key={label}
+                  disabled={audioItem && !!audioSaving}
                   onClick={(e) => {
-                    (run as () => void)();
+                    run();
                     e.currentTarget.closest("details")?.removeAttribute("open");
                   }}
                 >
-                  {label as string}
+                  {label}
                 </button>
               ))}
             </div>
@@ -718,6 +781,31 @@ export function MeetingDetail({
                         src={audioSource || undefined}
                         preload="metadata"
                       />
+                      {playingFile && (
+                        <div className="audio-download">
+                          <button
+                            className="button secondary small"
+                            onClick={() => void saveAudio(playingFile)}
+                            disabled={!!audioSaving}
+                          >
+                            {audioSaving ? (
+                              <LoaderCircle size={14} className="spin" />
+                            ) : (
+                              <Download size={14} />
+                            )}
+                            {audioSaving ||
+                              (audioFiles.length > 1
+                                ? `録音${audioFiles.indexOf(playingFile) + 1}をダウンロード`
+                                : "音声をダウンロード")}
+                          </button>
+                          {playingFile.parts.length > 1 && (
+                            <small>
+                              自動分割して保存した{playingFile.parts.length}
+                              件を、1つの音声ファイルにまとめて保存します。
+                            </small>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                   {m.segments.length ? (
@@ -934,11 +1022,12 @@ export function MeetingDetail({
                 }
                 onClick={() => {
                   setRetryTemplate(m.template);
+                  setRetryModel(meetingModel);
                   setConfirm("regenerate");
                 }}
               >
                 <RefreshCw size={13} />
-                詳しさを変えて再生成
+                モデル・詳しさを変えて再生成
               </button>
             )}
             <button
@@ -963,26 +1052,47 @@ export function MeetingDetail({
           locked={busy}
         >
           {confirm === "regenerate" && (
-            <label className="field">
-              議事録の詳しさ
-              <select
-                value={retryTemplate}
-                onChange={(event) => setRetryTemplate(event.target.value as Meeting["template"])}
-                disabled={busy}
-              >
-                <option value="standard">標準</option>
-                <option value="brief">要点を簡潔に</option>
-                <option value="detailed">背景も詳しく</option>
-              </select>
-              <small>詳しくする場合も、会話に含まれる背景・理由・異論を整理します。会話にない内容は補いません。</small>
-            </label>
+            <div className="retry-options">
+              <label className="field">
+                解析モデル
+                <select
+                  value={retryModel}
+                  onChange={(event) => setRetryModel(event.target.value)}
+                  disabled={busy}
+                >
+                  {minutesModels.map((id) => (
+                    <option key={id} value={id}>
+                      {modelName(id)}
+                      {id === meetingModel ? "（この会議で使用中）" : ""}
+                      {id === settingsModel && id !== meetingModel
+                        ? "（接続設定）"
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+                <small>この会議の再生成だけに使います。接続設定のモデルは変わりません。料金は選んだモデルの単価で記録します。</small>
+              </label>
+              <label className="field">
+                議事録の詳しさ
+                <select
+                  value={retryTemplate}
+                  onChange={(event) => setRetryTemplate(event.target.value as Meeting["template"])}
+                  disabled={busy}
+                >
+                  <option value="standard">標準</option>
+                  <option value="brief">要点を簡潔に</option>
+                  <option value="detailed">背景も詳しく</option>
+                </select>
+                <small>詳しくする場合も、会話に含まれる背景・理由・異論を整理します。会話にない内容は補いません。</small>
+              </label>
+            </div>
           )}
           <p className="confirm-copy">
             {confirm === "delete"
               ? m.status === "uploading"
                 ? "取り込み途中の会議を一覧から取り除きます。クラウドに送信済みの未完了音声は完全に削除され、元に戻せません。元の録音ファイルから再度取り込めます。"
                 : "会議と音声を一覧から取り除き、アプリの保存先にあるゴミ箱へ移動します。"
-              : "選んだ詳しさと接続設定のモデルで再解析します。保存済みの文字起こしは再利用し、未完了の音声がある場合のみ文字起こしを行います。添付資料は解析に使いません。編集した議事録本文とアクションの完了状態は上書きされます。カレンダーの手動変更と既存のタグは保持します。"}
+              : "選んだ解析モデルと詳しさで再解析します。保存済みの文字起こしは再利用し、未完了の音声がある場合のみ接続設定の文字起こしモデルで文字起こしを行います。添付資料は解析に使いません。編集した議事録本文とアクションの完了状態は上書きされます。カレンダーの手動変更と既存のタグは保持します。"}
           </p>
           <div className="modal-footer">
             <button

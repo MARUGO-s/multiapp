@@ -59,6 +59,8 @@ export interface Meeting {
     fileName: string;
     transcribed: boolean;
     fallbackModel?: string;
+    /** The selected recording a split part was cut from (chunked uploads only). */
+    sourceIndex?: number;
   }[];
   attachments?: Attachment[];
   duration: number | null;
@@ -192,6 +194,7 @@ export type CalendarEntry = ScheduleEvent & {
 };
 export const isWorking = (m: Meeting) =>
   ["transcribing", "analyzing"].includes(m.status);
+export const minutesModels = ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna"];
 export const modelName = (id?: string) =>
   id === "gpt-6-luna" ? "GPT-6 Luna" :
   id === "gpt-6-sol" ? "GPT-6 Sol" : "GPT-6 Astra";
