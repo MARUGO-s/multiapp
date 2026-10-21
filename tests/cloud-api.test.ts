@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createDemo } from "../supabase/functions/_shared/demo.mjs";
 import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
+import { GROUP_STORE_NAMES } from "../supabase/functions/_shared/store-names.mjs";
 import { decryptApiKey } from "../supabase/functions/_shared/key-crypto.mjs";
 import { aacFixture } from "./fixtures/aac.mjs";
 import { documentFixtures } from "./fixtures/documents.mjs";
@@ -49,6 +50,7 @@ const audioObjects = new Map<string, Blob>();
 const responses = new Map<string, any>();
 const usageEvents = new Map<string, any>();
 let failSecondRecording = false;
+let storeNameFixes: any[] = [];
 let geminiFailures = 0;
 let geminiIncomplete = 0;
 let geminiDailyLimit = false;
@@ -380,6 +382,7 @@ globalThis.fetch = async (input, init: any) => {
       assert.equal(form.get("model"), "gpt-transcribe");
       assert.deepEqual(form.getAll("languages[]"), ["ja"]);
       assert.equal(form.get("language"), null);
+      assert.deepEqual(form.getAll("keywords[]"), [...GROUP_STORE_NAMES]);
       assert.equal(form.get("response_format"), "json");
       const file = form.get("file") as File;
       assert.ok(file instanceof File);
@@ -425,7 +428,7 @@ globalThis.fetch = async (input, init: any) => {
       assert.equal(body.text.format.strict, true);
       assert.deepEqual(body.text.format.schema.properties.formats.required, ["brief", "standard", "detailed"]);
       const id = `resp-${calls.length}`;
-      responses.set(id, minutesBundle((createDemo() as any).minutes));
+      responses.set(id, { ...minutesBundle((createDemo() as any).minutes), storeNameFixes });
       return json({ id, status: "queued" });
     }
     return json({
@@ -1625,6 +1628,26 @@ Deno.test(
         calls.filter((c) => c.route.endsWith("/transcriptions")).length,
         transcribedBefore,
       );
+      // Misheard store names reported with the minutes are corrected in the saved transcript.
+      regenerated().transcript = "話者0: 丸5オットの原価率は27%。丸の内も人員不足。";
+      storeNameFixes = [
+        { heard: "丸5オット", store: "マルゴ オット" },
+        { heard: "丸の内", store: "マルゴ丸の内" }, // part of an official name: ignored
+      ];
+      const fixRetry = await request(`${docRoute}/retry`, "valid-b", {
+        method: "POST",
+        body: JSON.stringify({ model: chosenModel }),
+      });
+      assert.equal(fixRetry.status, 202);
+      await drain();
+      await request("/meetings");
+      await drain();
+      storeNameFixes = [];
+      assert.equal(regenerated().status, "done");
+      assert.equal(regenerated().transcript, "話者0: マルゴ オットの原価率は27%。丸の内も人員不足。");
+      assert.deepEqual(regenerated().storeNameFixes, [{ heard: "丸5オット", store: "マルゴ オット", count: 1 }]);
+      assert.equal(regenerated().minutes.storeNameFixes, undefined);
+      assert.match(calls.filter((c) => c.route === "/v1/responses").at(-1)!.body.input[0].content, /マルゴ オット/);
       const insightMeeting ={ ...createDemo(), isDemo: false, source: "text", analysisId: crypto.randomUUID() };
       rows.set(insightMeeting.id, { owner, document: insightMeeting, audioPath: null, responseId: null });
       const postInsight = (body: any) => ({ method: "POST", body: JSON.stringify(body) });

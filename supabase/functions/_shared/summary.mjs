@@ -6,6 +6,11 @@ import {
   normalizeScheduleEvents,
   calendarPrompt,
 } from "./calendar.mjs";
+import {
+  GROUP_STORE_NAMES,
+  STORE_NAME_GUIDANCE,
+  applyStoreNameFixes,
+} from "./store-names.mjs";
 // Attachments are stored for reference only and are never sent to the AI.
 export const CalendarMinutesSchema = MinutesSchema.extend({
   scheduleEvents: z.array(ScheduleEventSchema),
@@ -30,6 +35,11 @@ export const AllFormatsMinutesSchema = z.object({
   openQuestions: z.array(z.string()),
   recordNotes: z.array(z.string()),
   scheduleEvents: z.array(ScheduleEventSchema),
+  // Misheard group store names in the transcript (e.g. 「丸5」 for 「マルゴ」).
+  // Applied to the saved transcript, never stored inside the minutes.
+  storeNameFixes: z.array(
+    z.object({ heard: z.string(), store: z.enum(GROUP_STORE_NAMES) }),
+  ),
   formats: z.object({
     brief: NarrativeSchema,
     standard: NarrativeSchema,
@@ -78,7 +88,9 @@ export function parseMinutes(meeting, value) {
   // A partial bundle is not a successful result. Keep the previously saved
   // documents if any view is missing or malformed; never invent a fallback.
   if (Object.hasOwn(value || {}, "decisionItems")) {
-    const { decisionItems, ...bundle } = AllFormatsMinutesSchema.parse(value);
+    // Responses started before storeNameFixes existed do not carry it.
+    const { decisionItems, storeNameFixes: _fixes, ...bundle } =
+      AllFormatsMinutesSchema.parse({ storeNameFixes: [], ...value });
     return selectedFormat(meeting, {
       ...bundle,
       decisions: decisionItems.map((item) => item.decision),
@@ -101,6 +113,20 @@ export function parseMinutes(meeting, value) {
   const { scheduleEvents: _old, ...legacy } = minutes;
   return legacy;
 }
+// Minutes plus the transcript corrected for misheard store names, when any.
+export function minutesResult(meeting, value) {
+  const minutes = parseMinutes(meeting, value);
+  const { transcript, applied } = applyStoreNameFixes(
+    meeting.transcript || "",
+    value?.storeNameFixes,
+  );
+  if (!applied.length) return { minutes };
+  return {
+    minutes,
+    transcript,
+    storeNameFixes: [...(meeting.storeNameFixes || []), ...applied],
+  };
+}
 export function summaryInput(meeting) {
   const system = `あなたは正確な日本語の議事録作成者です。同じ会話から要約版・標準版・詳細版を1回の応答で同時に作成する。まず共通の記録の範囲・決定事項・次の対応・未定事項・記録上の注意・予定を整理し、formatsのbrief・standard・detailedに各形式のsummaryとtopicsを保存する。原文を3回繰り返したり、別の会議として独立解析したりしない。
 ${MINUTES_FORMATS.map((format) => `${format.id}（${format.label}）：${format.instruction}`).join("\n")}
@@ -117,7 +143,7 @@ recordScopeは記録の範囲を短く書く（例：「録音1〜3の全編」�
     transcript: meeting.transcript,
   });
   return [
-    { role: "system", content: system + calendarPrompt },
+    { role: "system", content: system + "\n" + STORE_NAME_GUIDANCE + calendarPrompt },
     { role: "user", content },
   ];
 }

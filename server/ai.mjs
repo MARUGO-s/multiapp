@@ -14,6 +14,7 @@ import {
   GEMINI_TRANSCRIPTION_MODEL,
   transcribeWithGemini,
 } from "../supabase/functions/_shared/gemini-transcribe.mjs";
+import { GROUP_STORE_NAMES } from "../supabase/functions/_shared/store-names.mjs";
 
 export function createAI(
   apiKey,
@@ -49,6 +50,8 @@ export function createAI(
         model: "gpt-transcribe",
         response_format: "json",
         languages: ["ja"],
+        // Group store names, so 「マルゴ」 is not heard as 「丸5」.
+        keywords: [...GROUP_STORE_NAMES],
       });
       await onUsage(response);
       const transcript = response.text;
@@ -73,7 +76,11 @@ export function createAI(
       await onUsage(response);
       if (response.status !== "completed" || !response.output_parsed)
         throw new Error("No complete structured output");
-      return parseMinutes(meeting, response.output_parsed);
+      // Keep the store-name fixes for the caller to apply to the transcript.
+      return {
+        ...parseMinutes(meeting, response.output_parsed),
+        storeNameFixes: response.output_parsed.storeNameFixes || [],
+      };
     },
   };
 }

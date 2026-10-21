@@ -23,6 +23,7 @@ import {
 } from "./fixtures/calendar.mjs";
 import { allCalendarEvents, eventKey } from "../supabase/functions/_shared/calendar.mjs";
 import { parseMinutes, summaryInput } from "../supabase/functions/_shared/summary.mjs";
+import { GROUP_STORE_NAMES } from "../supabase/functions/_shared/store-names.mjs";
 import { minutesBundle } from "./fixtures/minutes-bundle.mjs";
 
 test("1回の生成で3形式を永続化し、閲覧では再解析せず、各形式の編集と失敗時の旧本文を保持する", async (t) => {
@@ -1181,6 +1182,7 @@ test("実際のSDKリクエストはGPT Transcribeと指定のAstra/Sol/Lunaを�
           assert.equal(form.get("model"), "gpt-transcribe");
           assert.deepEqual(form.getAll("languages[]"), ["ja"]);
           assert.equal(form.get("language"), null);
+          assert.deepEqual(form.getAll("keywords[]"), [...GROUP_STORE_NAMES]);
           assert.equal(form.get("response_format"), "json");
           assert.equal(form.get("chunking_strategy"), null);
           return Response.json({ text: "文字起こしの本文。" });
@@ -1222,7 +1224,7 @@ test("実際のSDKリクエストはGPT Transcribeと指定のAstra/Sol/Lunaを�
       ...createDemo(),
       transcript: transcript.transcript,
     });
-    assert.deepEqual(result, parseMinutes(createDemo(), minutesBundle(sampleMinutes)));
+    assert.deepEqual(result, { ...parseMinutes(createDemo(), minutesBundle(sampleMinutes)), storeNameFixes: [] });
     assert.equal(calls.length, 2);
   }
 });

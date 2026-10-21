@@ -33,9 +33,10 @@ import {
 import {
   AllFormatsMinutesSchema,
   MINUTES_OUTPUT_TOKENS,
-  parseMinutes,
+  minutesResult,
   summaryInput,
 } from "../_shared/summary.mjs";
+import { GROUP_STORE_NAMES } from "../_shared/store-names.mjs";
 import {
   MAX_BATCH_SIZE,
   uploadDocument,
@@ -390,9 +391,9 @@ async function finalize(
       .filter((item: Doc) => item.type === "output_text")
       .map((item: Doc) => item.text)
       .join("");
-    let minutes;
+    let parsed;
     try {
-      minutes = parseMinutes(record.document, JSON.parse(text));
+      parsed = minutesResult(record.document, JSON.parse(text));
     } catch {
       return jobUpdate(owner, record, {
         status: "error",
@@ -400,9 +401,12 @@ async function finalize(
           "議事録の形式を確認できませんでした。文字起こしを確認して再試行してください。",
       });
     }
+    const { minutes, ...transcriptFix } = parsed;
     return jobUpdate(owner, record, {
       status: "done",
       minutes,
+      // Misheard store names corrected in the saved transcript, if any.
+      ...transcriptFix,
       ...minutesDocuments(record.document, minutes),
       completedActions: [],
       error: null,
@@ -530,6 +534,8 @@ async function processMeeting(
           form.set("model", OPENAI_TRANSCRIPTION_MODEL);
           form.set("response_format", "json");
           form.append("languages[]", "ja");
+          // Group store names, so 「マルゴ」 is not heard as 「丸5」.
+          for (const name of GROUP_STORE_NAMES) form.append("keywords[]", name);
           if (record.document.chunked && previous) {
             form.set("prompt", previous.slice(-1200));
           }
