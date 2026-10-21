@@ -737,7 +737,7 @@ export function MeetingDetail({
                       <p className="minutes-format-note">
                         {hasAllFormats
                           ? "3形式を保存済みです。切り替え時の追加AI課金はありません。"
-                          : "以前に作成した会議録です。「3形式を作成」から再生成すると、すべての形式を表示できます（AI使用料がかかります）。"}
+                          : "以前に作成した会議録です。「モデルを選んで3形式を作成」から再生成すると、すべての形式を表示できます（AI使用料がかかります）。"}
                       </p>
                     </div>
                   )}
@@ -1032,7 +1032,7 @@ export function MeetingDetail({
                 }}
               >
                 <RefreshCw size={13} />
-                {hasAllFormats ? "3形式を再生成" : "3形式を作成"}
+                {hasAllFormats ? "モデルを選んで3形式を再生成" : "モデルを選んで3形式を作成"}
               </button>
             )}
             <button
