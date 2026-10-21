@@ -107,7 +107,8 @@ test("再生成時に詳しさを変更・保存し、文字起こしは再利�
     await waitForJobs();
     const saved = store.get(meeting.id);
     assert.equal(saved.status, "done");
-    assert.match(saved.markdown, new RegExp(`再生成：${saved.template}`));
+    // The summary feeds the screen's key points; the minutes text no longer carries it.
+    assert.equal(saved.minutes.summary, `再生成：${saved.template}`);
     assert.deepEqual(saved.tags, ["既存タグ"]);
     assert.deepEqual(saved.completedActions, []);
   }
@@ -149,7 +150,7 @@ test("再生成時に解析モデルを選べ、接続設定のモデルは変�
   assert.equal(saved.minutesModel, "gpt-6-luna");
   assert.equal(saved.template, "brief");
   assert.equal(saved.model, undefined, "the choice is not stored as a meeting field");
-  assert.match(saved.markdown, /再生成：gpt-6-luna/);
+  assert.equal(saved.minutes.summary, "再生成：gpt-6-luna");
   assert.equal((await (await request("/settings")).json()).model, "gpt-6-astra");
   const month = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit",

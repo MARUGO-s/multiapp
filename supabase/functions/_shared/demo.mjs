@@ -68,6 +68,7 @@ export function createDemo() {
     topics: [
       {
         title: "リリース方針とスケジュール",
+        status: "決定",
         points: [
           "10月15日に既存のお客様向けに限定公開する。",
           "一般公開の時期は、限定公開後のお客様の反応を見て判断する。",
@@ -75,15 +76,22 @@ export function createDemo() {
       },
       {
         title: "デザイン・開発の進捗",
+        status: "報告",
         points: [
           "デザインはほぼ完成。スマートフォン表示の確認を含め、10月2日までに最終版を共有する。",
           "決済機能の結合テストを10月8日までに完了する。エラー表示は最終デザインを確認して調整する。",
         ],
+        notes: ["エラー表示をどこまで変更するかは、会議中に決まっていない。"],
       },
     ],
+    recordScope: "会議全体",
     decisions: [
       "10月15日に既存のお客様限定でサービスを公開する。",
       "料金プランは次回の会議で継続検討する。",
+    ],
+    decisionNotes: [
+      "一般公開の時期は、限定公開後のお客様の反応を見て判断します。",
+      "",
     ],
     actions: [
       {
@@ -99,9 +107,10 @@ export function createDemo() {
       },
     ],
     openQuestions: [
-      "一般公開の時期は限定公開後に判断する。",
-      "一般公開時の料金プラン。検討の担当者・期限は未定。",
+      "一般公開の時期",
+      "一般公開時の料金プランと、検討の担当者・期限",
     ],
+    recordNotes: ["操作確認用の架空の会議です。"],
   };
   meeting.markdown = minutesToMarkdown(meeting, meeting.minutes);
   return meeting;
