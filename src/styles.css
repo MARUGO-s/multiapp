@@ -5056,3 +5056,129 @@ button {
     display: none;
   }
 }
+
+/* In-app attachment viewer (AttachmentViewer.tsx) */
+.modal.attachment-viewer-modal {
+  width: min(1040px, calc(100vw - 32px));
+  height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.modal.attachment-viewer-modal:not([open]) {
+  display: none;
+}
+.modal.attachment-viewer-modal .modal-heading h2 {
+  overflow-wrap: anywhere;
+}
+.attachment-viewer {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f1f2f6;
+}
+.attachment-viewer-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.8;
+}
+.attachment-viewer-image {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+}
+.attachment-viewer .pdf-preview {
+  padding: 12px;
+}
+.attachment-viewer .pdf-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+.attachment-viewer .pdf-pagination button {
+  font: inherit;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+.attachment-viewer .pdf-pagination button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.attachment-viewer .pdf-canvas-container {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 200px;
+}
+.attachment-viewer .pdf-canvas-container canvas {
+  max-width: 100%;
+  background: #fff;
+  box-shadow: 0 2px 8px #0002;
+}
+.attachment-viewer-text {
+  margin: 0;
+  padding: 18px 20px;
+  background: #fff;
+  color: var(--ink);
+  font: 14px/1.8 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.attachment-viewer-table {
+  background: #fff;
+}
+.attachment-viewer-table table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 13px;
+}
+.attachment-viewer-table th,
+.attachment-viewer-table td {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+}
+.attachment-viewer-table th {
+  position: sticky;
+  top: 0;
+  background: #f4f2fb;
+  font-weight: 600;
+}
+.attachment-viewer-note {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.attachment-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.attachment-open:hover:not(:disabled) {
+  color: var(--purple);
+  text-decoration: underline;
+}
