@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Paperclip, Download, LoaderCircle, X, FileText, Image as ImageIcon, UploadCloud } from "lucide-react";
+import { Paperclip, Download, Eye, LoaderCircle, X, FileText, Image as ImageIcon, UploadCloud } from "lucide-react";
 import {
   attachmentTypes,
   isImageAttachment,
@@ -7,6 +7,8 @@ import {
 } from "../supabase/functions/_shared/attachments.mjs";
 import { api } from "./api";
 import { isCloud } from "./cloud";
+import { AttachmentViewer } from "./AttachmentViewer";
+import { previewKind } from "./attachment-preview.mjs";
 import type { Attachment, Meeting } from "./types";
 
 const fileSize = (bytes: number) =>
@@ -180,7 +182,8 @@ export function AttachmentPanel({
   const [files, setFiles] = useState<File[]>([]),
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState<string | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [viewing, setViewing] = useState<Attachment | null>(null);
   const saved = meeting.attachments || [];
   // Runs once per drop, not on later meeting updates.
   useEffect(() => {
@@ -272,9 +275,30 @@ export function AttachmentPanel({
           <div className="attachment-row">
             {isImageAttachment(file.name) ? <ImageIcon size={19} /> : <FileText size={19} />}
             <span className="attachment-name">
-              {file.name}
+              {previewKind(file.name) ? (
+                <button
+                  type="button"
+                  className="attachment-open"
+                  disabled={busy}
+                  onClick={() => setViewing(file)}
+                >
+                  {file.name}
+                </button>
+              ) : (
+                file.name
+              )}
               <small>{fileSize(file.size)}</small>
             </span>
+            {previewKind(file.name) && (
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={() => setViewing(file)}
+              >
+                <Eye size={15} />
+                表示
+              </button>
+            )}
             <button
               className="text-button"
               disabled={busy}
@@ -343,6 +367,14 @@ export function AttachmentPanel({
         <span>AIには送信せず、議事録の解析にも使いません。</span>
         <span>{isCloud ? "ログインした全員で共有" : "このPCに保存"}</span>
       </div>
+      {viewing && (
+        <AttachmentViewer
+          meeting={meeting}
+          file={viewing}
+          onClose={() => setViewing(null)}
+          onDownload={() => void download(viewing)}
+        />
+      )}
     </section>
   );
 }

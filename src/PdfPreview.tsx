@@ -7,7 +7,15 @@ import {
 } from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 GlobalWorkerOptions.workerSrc = workerUrl;
-export function PdfPreview({ url }: { url: string }) {
+export function PdfPreview({
+  url,
+  label = "公開PDF",
+  errorHint = "解決しない場合は公開元にお問い合わせください。",
+}: {
+  url: string;
+  label?: string;
+  errorHint?: string;
+}) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
   const [width, setWidth] = useState(900);
@@ -47,7 +55,7 @@ export function PdfPreview({ url }: { url: string }) {
       .catch(() => {
         if (alive) {
           setError(
-            "PDFを表示できませんでした。ブラウザーでページを再読み込みしてください。解決しない場合は公開元にお問い合わせください。",
+            `PDFを表示できませんでした。ブラウザーでページを再読み込みしてください。${errorHint}`,
           );
           setLoading(false);
         }
@@ -91,7 +99,7 @@ export function PdfPreview({ url }: { url: string }) {
     })().catch((e) => {
       if (alive && e?.name !== "RenderingCancelledException") {
         setError(
-          "このページを表示できませんでした。ブラウザーでページを再読み込みしてください。解決しない場合は公開元にお問い合わせください。",
+          `このページを表示できませんでした。ブラウザーでページを再読み込みしてください。${errorHint}`,
         );
         setLoading(false);
       }
@@ -102,7 +110,7 @@ export function PdfPreview({ url }: { url: string }) {
     };
   }, [pdf, page, width]);
   return (
-    <section aria-label="公開PDF" className="pdf-preview">
+    <section aria-label={label} className="pdf-preview">
       {pdf && pdf.numPages > 1 && (
         <div className="pdf-pagination">
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
@@ -124,7 +132,7 @@ export function PdfPreview({ url }: { url: string }) {
       <div ref={container} className="pdf-canvas-container">
         <canvas
           ref={canvas}
-          aria-label={`公開PDF ${page}ページ`}
+          aria-label={`${label} ${page}ページ`}
           role="img"
           hidden={!pdf || !!error}
         />
