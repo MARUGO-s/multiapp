@@ -827,10 +827,12 @@ export async function createApp({
         (f) => f.id === req.params.attachmentId,
       );
     if (!attachment) throw fail(404, "資料が見つかりません。");
-    res.download(
-      path.join(attachmentsDir, attachment.localFile),
-      attachment.name,
-    );
+    // Relative to attachmentsDir: an absolute path would make Express refuse
+    // the file whenever the data directory sits under a dot folder (.data).
+    res.download(attachment.localFile, attachment.name, {
+      root: attachmentsDir,
+      dotfiles: "deny",
+    });
   });
   app.delete(
     "/api/meetings/:id/attachments/:attachmentId",

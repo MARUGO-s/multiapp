@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Paperclip, Download, LoaderCircle, X, FileText, UploadCloud } from "lucide-react";
+import { Paperclip, Download, LoaderCircle, X, FileText, Image as ImageIcon, UploadCloud } from "lucide-react";
 import {
   attachmentTypes,
+  isImageAttachment,
   validateAttachments,
 } from "../supabase/functions/_shared/attachments.mjs";
 import { api } from "./api";
@@ -87,7 +88,7 @@ export function AttachmentPicker({
             ファイルを選択
           </button>
           <p className="field-hint">
-            Excel・Word・PDF・PowerPoint・CSV・TXT ／
+            Excel・Word・PDF・PowerPoint・CSV・TXT・画像 ／
             最大5ファイル・各10 MB・合計25 MB
           </p>
         </div>
@@ -108,7 +109,7 @@ export function AttachmentPicker({
             </button>
           </div>
           <p className="field-hint">
-            Excel・Word・PDF・PowerPoint・CSV・TXT ／ 最大5ファイル・各10 MB・合計25
+            Excel・Word・PDF・PowerPoint・CSV・TXT・画像（JPEG・PNG・GIF・WebP・HEIC） ／ 最大5ファイル・各10 MB・合計25
             MB（録音とは別枠）
           </p>
           <div className="attachment-drop-hint">
@@ -131,7 +132,7 @@ export function AttachmentPicker({
       />
       {files.map((file, index) => (
         <div className="attachment-row" key={`${index}-${file.name}`}>
-          <FileText size={18} />
+          {isImageAttachment(file.name) ? <ImageIcon size={18} /> : <FileText size={18} />}
           <span className="attachment-name">
             {file.name}
             <small>{fileSize(file.size)}</small>
@@ -269,7 +270,7 @@ export function AttachmentPanel({
       {saved.map((file) => (
         <div className="attachment-item" key={file.id}>
           <div className="attachment-row">
-            <FileText size={19} />
+            {isImageAttachment(file.name) ? <ImageIcon size={19} /> : <FileText size={19} />}
             <span className="attachment-name">
               {file.name}
               <small>{fileSize(file.size)}</small>

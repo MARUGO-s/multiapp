@@ -15,9 +15,21 @@ export const attachmentTypes = {
   ".ppt": "application/vnd.ms-powerpoint",
   ".csv": "text/csv",
   ".txt": "text/plain",
+  // Photos and screenshots. SVG is excluded: it can carry scripts.
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
 };
 export const attachmentExtension = (name) =>
   `.${name.split(".").pop().toLowerCase()}`;
+export const isImageAttachment = (name) =>
+  (attachmentTypes[attachmentExtension(name)] || "").startsWith("image/");
+export const ATTACHMENT_KINDS_LABEL =
+  "PDF・Excel（xls/xlsx）・Word（doc/docx）・PowerPoint・CSV・TXT・画像（JPEG・PNG・GIF・WebP・HEIC）";
 const fail = (message) =>
   Object.assign(new Error(message), { status: 400, publicMessage: message });
 export async function attachmentDigest(bytes) {
@@ -45,7 +57,7 @@ export function validateAttachments(files) {
     )
   )
     throw fail(
-      "PDF・Excel（xls/xlsx）・Word（doc/docx）・PowerPoint・CSV・TXTの資料を選んでください。",
+      `${ATTACHMENT_KINDS_LABEL}の資料を選んでください。`,
     );
 }
 export const AttachmentPlanSchema = z
@@ -131,4 +143,23 @@ export function validateAttachmentBytes(name, bytes) {
     throw fail(
       "旧Officeファイルの形式を確認できません。xlsx・docx・pptxかPDFで書き出してください。",
     );
+  if (attachmentTypes[ext]?.startsWith("image/") && !imageMatches(ext, bytes))
+    throw fail(
+      "画像の形式を確認できません。JPEG・PNGなどで保存し直してください。",
+    );
+}
+const HEIF_BRANDS = new Set(["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"]);
+function imageMatches(ext, bytes) {
+  const at = (offset, text) =>
+    [...text].every((c, i) => bytes[offset + i] === c.charCodeAt(0));
+  if (ext === ".jpg" || ext === ".jpeg")
+    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (ext === ".png")
+    return [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((v, i) => bytes[i] === v);
+  if (ext === ".gif") return at(0, "GIF87a") || at(0, "GIF89a");
+  if (ext === ".webp") return at(0, "RIFF") && at(8, "WEBP");
+  if (ext === ".heic" || ext === ".heif")
+    return at(4, "ftyp") &&
+      HEIF_BRANDS.has(String.fromCharCode(...bytes.subarray(8, 12)));
+  return false;
 }
