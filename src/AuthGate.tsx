@@ -21,7 +21,22 @@ import { QrAccountAccess } from "./QrAccountAccess";
 import { PortalGoogleAccess } from "./PortalGoogleAccess";
 import { portalGoogleAuthEnabled, qrAuth } from "./qr-account-client";
 import { isAccountNavigation } from "./qr-account-routing.mjs";
+import {
+  browserPassword,
+  forgetLogin,
+  rememberLogin,
+  rememberedLogin,
+  storeBrowserPassword,
+} from "./login-memory.mjs";
 import "./qr-accounts.css";
+
+const safeStorage = () => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
 
 export type Application = "kotonoha" | "qr";
 export function AuthGate({
@@ -42,8 +57,10 @@ export function AuthGate({
   const [application, setApplication] = useState<Application | null>(null);
   const [session, setSession] = useState<SharedSession | null>(null);
   const [loading, setLoading] = useState(isCloud);
-  const [loginId, setLoginId] = useState("");
+  const [remembered] = useState(() => rememberedLogin(safeStorage()));
+  const [loginId, setLoginId] = useState(remembered.loginId);
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(remembered.remember);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [identity, setIdentity] = useState<string | null>(null);
@@ -129,6 +146,18 @@ export function AuthGate({
           ? "kotonoha — 会議録ワークスペース"
           : "MARUGO — アプリ選択・ログイン";
   }, [application]);
+  useEffect(() => {
+    // Ask the browser for the saved password only for a remembered login.
+    if (!isCloud || session || !remembered.remember) return;
+    let alive = true;
+    void browserPassword(navigator, window).then((saved) => {
+      if (!alive || !saved || saved.loginId !== remembered.loginId) return;
+      setPassword((current) => current || saved.password);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [session, remembered]);
   async function login(e: FormEvent) {
     e.preventDefault();
     if (!isCloud || session) {
@@ -138,7 +167,16 @@ export function AuthGate({
     setBusy(true);
     setError("");
     try {
-      await signIn(loginId.trim(), password);
+      const id = loginId.trim();
+      await signIn(id, password);
+      if (remember) {
+        rememberLogin(safeStorage(), id);
+        await storeBrowserPassword(navigator, window, id, password);
+      } else {
+        forgetLogin(safeStorage());
+        // Stop the browser from filling this site's password on its own.
+        await navigator.credentials?.preventSilentAccess?.().catch(() => {});
+      }
       setPassword("");
       setApplication(selectedApplication);
     } catch (e) {
@@ -253,6 +291,8 @@ export function AuthGate({
                   ログインID
                   <input
                     type="text"
+                    name="username"
+                    id="login-id"
                     autoComplete="username"
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
@@ -267,12 +307,31 @@ export function AuthGate({
                   パスワード
                   <input
                     type="password"
+                    name="password"
+                    id="login-password"
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={busy}
                   />
+                </label>
+                <label className="login-remember">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => {
+                      setRemember(e.target.checked);
+                      if (!e.target.checked) forgetLogin(safeStorage());
+                    }}
+                    disabled={busy}
+                  />
+                  <span>
+                    IDとパスワードを記録する
+                    <small>
+                      IDはこの端末に、パスワードはブラウザのパスワード管理に保存します。共用端末ではチェックしないでください。
+                    </small>
+                  </span>
                 </label>
               </>
             )}
