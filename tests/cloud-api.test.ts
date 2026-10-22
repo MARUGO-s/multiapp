@@ -1667,6 +1667,27 @@ Deno.test(
       assert.deepEqual(regenerated().storeNameFixes, [{ heard: "丸5オット", store: "マルゴ オット", count: 1 }]);
       assert.equal(regenerated().minutes.storeNameFixes, undefined);
       assert.match(calls.filter((c) => c.route === "/v1/responses").at(-1)!.body.input[0].content, /マルゴ オット/);
+      // Photos and screenshots can be attached to a finished meeting; SVG cannot.
+      const png = new File(
+        [new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])],
+        "ホワイトボード.png",
+        { type: "image/png" },
+      );
+      const imageId = crypto.randomUUID();
+      const imageResult = await uploadDocument(png, imageId, "valid-b");
+      assert.equal(imageResult.status, 201, await imageResult.clone().text());
+      const imageSaved = rows.get(documentMeeting.id).document.attachments.find((a: any) => a.id === imageId);
+      assert.equal(imageSaved.type, "image/png");
+      assert.equal(imageSaved.name, "ホワイトボード.png");
+      assert.ok(imageSaved.storagePath.endsWith(".png"));
+      assert.deepEqual(
+        new Uint8Array(await audioObjects.get(`/storage/v1/object/kotonoha-documents/${imageSaved.storagePath}`)!.arrayBuffer()),
+        new Uint8Array(await png.arrayBuffer()),
+      );
+      const fakePng = new File([new TextEncoder().encode("%PDF-1.7")], "偽装.png", { type: "image/png" });
+      assert.equal((await uploadDocument(fakePng, crypto.randomUUID(), "valid-b")).status, 400);
+      const svg = new File(['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'], "logo.svg", { type: "image/svg+xml" });
+      assert.equal((await uploadDocument(svg, crypto.randomUUID(), "valid-b")).status, 400);
       const insightMeeting ={ ...createDemo(), isDemo: false, source: "text", analysisId: crypto.randomUUID() };
       rows.set(insightMeeting.id, { owner, document: insightMeeting, audioPath: null, responseId: null });
       const postInsight = (body: any) => ({ method: "POST", body: JSON.stringify(body) });
