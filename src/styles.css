@@ -146,6 +146,34 @@ body {
   line-height: 1.9;
   margin: 0;
 }
+.login-remember {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 2px 0 18px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-remember input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--purple);
+  cursor: pointer;
+}
+.login-remember span {
+  display: grid;
+  gap: 3px;
+}
+.login-remember small {
+  color: #747789;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.7;
+}
 @media (max-width: 760px) {
   .login-page {
     grid-template-columns: 1fr;
