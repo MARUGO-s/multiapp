@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { meetingEvents } from "../supabase/functions/_shared/calendar.mjs";
 import { BotStatus } from "./BotStatus";
+import { RecordingLocations } from "./RecordingLocations";
+import { withoutRecordingLocations } from "./meeting-exports.mjs";
 import { api, download, audioBlob, audioUrl } from "./api";
 import { joinRecordings } from "./split-recordings.mjs";
 import {
@@ -500,7 +502,7 @@ export function MeetingDetail({
                     () =>
                       download(
                         `${m.title}.json`,
-                        JSON.stringify(m, null, 2),
+                        JSON.stringify(withoutRecordingLocations(m), null, 2),
                         "application/json",
                       ),
                   ],
@@ -601,6 +603,7 @@ export function MeetingDetail({
         </div>
       )}
       {m.bot && <BotStatus meeting={m} onChange={onChange} />}
+      <RecordingLocations meeting={m} onChange={onChange} notify={notify} />
       {processing && (
         <div className="progress-panel" role="status">
           <LoaderCircle className="spin" size={23} />

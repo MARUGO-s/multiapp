@@ -3,6 +3,11 @@
 // they arrive so an unexpected tab close or crash loses at most a few
 // seconds, not the whole recording.
 
+import type { RecordingLocation } from "./types";
+import {
+  captureRecordingLocation,
+  rememberRecordingLocation,
+} from "./recording-location.mjs";
 export type RecordingMode = "mic" | "mic+tab";
 
 const DB_NAME = "kotonoha-recorder";
@@ -16,6 +21,14 @@ export interface RecordingSessionMeta {
   mode: RecordingMode;
   mimeType: string;
   extension: string;
+  draftId?: string;
+  scope?: { ownerId: string; actorId: string };
+  startLocation?: RecordingLocation;
+  // Absence (legacy), interrupted recording, and failed sealing are UNKNOWN,
+  // not evidence that the stored prefix is a complete original.
+  integrity?: "recording" | "failed" | "complete";
+  expectedChunks?: number;
+  failedIndices?: number[];
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -47,44 +60,66 @@ async function putChunk(sessionId: string, index: number, blob: Blob) {
         blob,
       });
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = tx.onabort = () =>
+        reject(
+          tx.error || new Error("端末内の録音保存・削除が中断されました。"),
+        );
     });
   } finally {
     db.close();
   }
 }
 
-async function getChunks(sessionId: string): Promise<Blob[]> {
+async function getChunks(
+  sessionId: string,
+): Promise<{ index: number; blob: Blob }[]> {
   const db = await openDb();
   try {
     const chunks = await new Promise<{ index: number; blob: Blob }[]>(
       (resolve, reject) => {
         const tx = db.transaction(CHUNK_STORE, "readonly");
-        const req = tx.objectStore(CHUNK_STORE).index("bySession").getAll(sessionId);
+        const req = tx
+          .objectStore(CHUNK_STORE)
+          .index("bySession")
+          .getAll(sessionId);
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       },
     );
-    return chunks.sort((a, b) => a.index - b.index).map((c) => c.blob);
+    return chunks.sort((a, b) => a.index - b.index);
   } finally {
     db.close();
   }
 }
 
-async function deleteSession(sessionId: string) {
+async function deleteSession(
+  sessionId: string,
+  authorize: () => void = () => {},
+) {
   const db = await openDb();
   try {
     await new Promise<void>((resolve, reject) => {
+      authorize();
       const tx = db.transaction([CHUNK_STORE, SESSION_STORE], "readwrite");
       const chunkStore = tx.objectStore(CHUNK_STORE);
       const range = tx.objectStore(CHUNK_STORE).index("bySession");
       const req = range.getAllKeys(sessionId);
       req.onsuccess = () => {
+        try {
+          authorize();
+        } catch (error) {
+          tx.abort();
+          reject(error);
+          return;
+        }
         for (const key of req.result) chunkStore.delete(key as IDBValidKey);
       };
       tx.objectStore(SESSION_STORE).delete(sessionId);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = tx.onabort = () =>
+        reject(
+          tx.error || new Error("端末内の録音保存・削除が中断されました。"),
+        );
     });
   } finally {
     db.close();
@@ -98,7 +133,10 @@ async function putSessionMeta(meta: RecordingSessionMeta) {
       const tx = db.transaction(SESSION_STORE, "readwrite");
       tx.objectStore(SESSION_STORE).put(meta);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.onerror = tx.onabort = () =>
+        reject(
+          tx.error || new Error("端末内の録音保存・削除が中断されました。"),
+        );
     });
   } finally {
     db.close();
@@ -134,18 +172,32 @@ export async function recoverSession(id: string): Promise<File> {
   const sessions = await listRecoverableSessions();
   const meta = sessions.find((s) => s.id === id);
   if (!meta) throw new Error("録音が見つかりません。");
-  const blobs = await getChunks(id);
-  if (!blobs.length) {
-    await deleteSession(id);
-    throw new Error("復元できる録音データがありません。");
-  }
-  const file = new File([...blobs], fileName(meta), { type: meta.mimeType });
-  await deleteSession(id);
+  const chunks = await getChunks(id);
+  if (
+    meta.integrity !== "complete" ||
+    !Number.isInteger(meta.expectedChunks) ||
+    !meta.expectedChunks ||
+    meta.failedIndices?.length ||
+    chunks.length !== meta.expectedChunks ||
+    chunks.some((c, i) => c.index !== i || !c.blob.size)
+  )
+    throw new Error(
+      "録音の完全性を確認できません（保存失敗・未完了または不完全な録音）。通常の取り込み・送信は停止し、端末内の原音を保全しています。画面を閉じず、元の録音機器・ファイルも保全してください。",
+    );
+  const file = new File(
+    chunks.map((c) => c.blob),
+    fileName(meta),
+    { type: meta.mimeType },
+  );
+  rememberRecordingLocation(file, meta.startLocation);
   return file;
 }
 
-export async function discardSession(id: string) {
-  await deleteSession(id);
+export async function discardSession(
+  id: string,
+  authorize: () => void = () => {},
+) {
+  await deleteSession(id, authorize);
 }
 
 export interface RecordingCapabilities {
@@ -194,6 +246,7 @@ function pickMimeType(): { mimeType: string; extension: string } {
 }
 
 export interface RecorderController {
+  sessionId: string;
   pause(): void;
   resume(): void;
   stop(): Promise<File>;
@@ -204,6 +257,12 @@ export interface RecorderController {
 export async function startRecording(
   mode: RecordingMode,
   onTick: (seconds: number) => void,
+  options: {
+    draftId?: string;
+    scope?: { ownerId: string; actorId: string };
+    recordLocation?: boolean;
+    onStorageError?: (error: Error) => void;
+  } = {},
 ): Promise<RecorderController> {
   const picked = pickMimeType();
   if (!picked.mimeType)
@@ -258,9 +317,7 @@ export async function startRecording(
     audioContext.createMediaStreamSource(displayStream).connect(destination);
   const analyser = audioContext.createAnalyser();
   analyser.fftSize = 512;
-  destination.stream
-    .getAudioTracks()
-    .length &&
+  destination.stream.getAudioTracks().length &&
     audioContext.createMediaStreamSource(destination.stream).connect(analyser);
 
   const sessionId =
@@ -273,8 +330,21 @@ export async function startRecording(
     mode,
     mimeType: picked.mimeType,
     extension: picked.extension,
+    draftId: options.draftId,
+    scope: options.scope,
+    integrity: "recording",
+    expectedChunks: 0,
+    failedIndices: [],
   };
-  await putSessionMeta(meta);
+  try {
+    await putSessionMeta(meta);
+  } catch (error) {
+    micStream.getTracks().forEach((t) => t.stop());
+    displayStream?.getTracks().forEach((t) => t.stop());
+    await audioContext.close();
+    options.onStorageError?.(error as Error);
+    throw error;
+  }
 
   const recorder = new MediaRecorder(destination.stream, {
     mimeType: picked.mimeType,
@@ -282,26 +352,53 @@ export async function startRecording(
   });
   let chunkIndex = 0;
   let pendingWrites = Promise.resolve();
+  let storageError: Error | null = null;
   recorder.ondataavailable = (e) => {
     if (!e.data.size) return;
     const index = chunkIndex++;
     pendingWrites = pendingWrites.then(() =>
-      putChunk(sessionId, index, e.data).catch(() => {}),
+      putChunk(sessionId, index, e.data).catch((error: Error) => {
+        storageError = error;
+        meta.integrity = "failed";
+        meta.expectedChunks = chunkIndex;
+        meta.failedIndices!.push(index);
+        options.onStorageError?.(error);
+        // If even this write fails, the initial durable 'recording' sentinel
+        // remains unsealed. It can never be recovered as a normal File.
+        return putSessionMeta(meta).catch(() => {});
+      }),
     );
   };
   recorder.start(4000);
+  const cancelLocation = captureRecordingLocation({
+    enabled: options.recordLocation === true,
+    geolocation: navigator.geolocation,
+    onLocation: (point: RecordingLocation) => {
+      meta.startLocation = point;
+      pendingWrites = pendingWrites.then(() =>
+        putSessionMeta(meta).catch((error: Error) => {
+          storageError = error;
+          options.onStorageError?.(error);
+        }),
+      );
+    },
+  });
 
   let wakeLock: WakeLockSentinel | null = null;
   const requestWakeLock = async () => {
     try {
-      wakeLock = (await (navigator as any).wakeLock?.request?.("screen")) ?? null;
+      wakeLock =
+        (await (navigator as any).wakeLock?.request?.("screen")) ?? null;
     } catch {
       wakeLock = null;
     }
   };
   await requestWakeLock();
   const onVisibilityChange = () => {
-    if (document.visibilityState === "visible" && recorder.state === "recording")
+    if (
+      document.visibilityState === "visible" &&
+      recorder.state === "recording"
+    )
       requestWakeLock();
   };
   document.addEventListener("visibilitychange", onVisibilityChange);
@@ -323,11 +420,15 @@ export async function startRecording(
     wakeLock?.release().catch(() => {});
     micStream?.getTracks().forEach((t) => t.stop());
     displayStream?.getTracks().forEach((t) => t.stop());
-    audioContext.close().catch((e) => console.error("AudioContext close failed:", e));
+    audioContext
+      .close()
+      .catch((e) => console.error("AudioContext close failed:", e));
   };
+  let stopped: Promise<File> | null = null;
 
   return {
     getAnalyser: () => analyser,
+    sessionId,
     pause() {
       if (recorder.state !== "recording") return;
       recorder.pause();
@@ -339,22 +440,18 @@ export async function startRecording(
       recorder.resume();
     },
     stop() {
-      return new Promise<File>((resolve, reject) => {
+      cancelLocation();
+      if (stopped) return stopped;
+      stopped = new Promise<File>((resolve, reject) => {
         recorder.onstop = async () => {
           cleanup();
           try {
             await pendingWrites;
-            const blobs = await getChunks(sessionId);
-            if (!blobs.length) {
-              await deleteSession(sessionId);
-              reject(new Error("録音データがありません。"));
-              return;
-            }
-            const file = new File([...blobs], fileName(meta), {
-              type: picked.mimeType,
-            });
-            await deleteSession(sessionId);
-            resolve(file);
+            if (storageError) throw storageError;
+            meta.integrity = "complete";
+            meta.expectedChunks = chunkIndex;
+            await putSessionMeta(meta);
+            resolve(await recoverSession(sessionId));
           } catch (e) {
             reject(e as Error);
           }
@@ -362,8 +459,10 @@ export async function startRecording(
         if (recorder.state === "inactive") recorder.onstop(new Event("stop"));
         else recorder.stop();
       });
+      return stopped;
     },
     async cancel() {
+      cancelLocation();
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         if (recorder.state === "inactive") resolve();

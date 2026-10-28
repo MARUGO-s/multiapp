@@ -51,6 +51,8 @@ export const MeetingTagsSchema = z
 
 export const PatchSchema = z
   .object({
+    // Deletion only: saved coordinates cannot be reintroduced by a stale client.
+    recordingLocations: z.null().optional(),
     title: z.string().trim().min(1).max(160).optional(),
     tags: MeetingTagsSchema.optional(),
     markdown: z.string().max(150_000).optional(),
@@ -97,6 +99,16 @@ export function minutesDocuments(meeting, minutes) {
 // Old clients without markdownFormat still edit the meeting's initial view.
 export function minutesMarkdownPatch(meeting, patch) {
   const { markdownFormat, ...result } = patch;
+  if (patch.recordingLocations === null) {
+    result.recordingLocations = [];
+    if (meeting.sources) result.sources = meeting.sources.map(({ startLocation, ...source }) => source);
+    // The frozen retry manifest is another persisted copy of the same location.
+    // Keep identity/planDigest unchanged: retries are bound to the original input.
+    if (meeting.uploadInput?.sources) result.uploadInput = {
+      ...meeting.uploadInput,
+      sources: meeting.uploadInput.sources.map(({ startLocation, ...source }) => source),
+    };
+  }
   const selected = markdownFormat ?? meeting.template;
   if (markdownFormat !== undefined &&
       !Object.hasOwn(meeting.markdownByFormat || {}, markdownFormat)) {

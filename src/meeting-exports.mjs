@@ -46,9 +46,15 @@ export function exportToICS(meetings) {
   }
   return [...lines, "END:VCALENDAR"].map(fold).join("\r\n") + "\r\n";
 }
+// Export projection only. Preserve calendar event locations and never mutate storage.
+export function withoutRecordingLocations(meeting) {
+  const { recordingLocations, ...result } = meeting;
+  if (result.sources) result.sources = result.sources.map(({ startLocation, ...source }) => source);
+  return result;
+}
 export function exportMultipleMeetings(meetings, format) {
   if (format === "ics") return exportToICS(meetings);
-  if (format === "json") return JSON.stringify(meetings, null, 2);
+  if (format === "json") return JSON.stringify(meetings.map(withoutRecordingLocations), null, 2);
   return [
     "# 会議録一括エクスポート",
     ...meetings.map(

@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build && node scripts/build-pdf-assets.mjs",
     "start": "node server/index.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:offline-browser": "node scripts/test-offline-browser.mjs",
     "check": "npm run build && npm test",
     "preview:qr-logos": "node scripts/check-qr-logo-ui.mjs",
     "test:qr-logo-browser": "node scripts/test-qr-logo-browser.mjs && node scripts/test-qr-logo-feature-browser.mjs && node scripts/test-qr-store-browser.mjs",

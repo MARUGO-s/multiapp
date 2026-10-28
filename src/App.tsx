@@ -52,6 +52,8 @@ import {
   type ScheduleEvent,
 } from "./types";
 import { NewMeeting } from "./NewMeeting";
+import { OfflineQueue } from "./OfflineQueue";
+import { getUploadContext, uploadRecordings } from "./upload-recordings";
 import { SettingsDialog } from "./SettingsDialog";
 import { ActionList, MeetingDetail } from "./MeetingDetail";
 import { Calendar } from "./Calendar";
@@ -88,6 +90,12 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
   const [calendarDate, setCalendarDate] = useState(tokyoToday);
   const [selected, setSelected] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  useEffect(() => {
+    // Cache a verified scope while connected, before the recording form opens.
+    // Do not infer an owner from a login label or fall back to another account.
+    void getUploadContext().catch(() => {});
+  }, []);
+  const [offlineDraftId, setOfflineDraftId] = useState<string | undefined>();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -344,12 +352,9 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
     }
   }
   async function create(data: FormData, progress: (message: string) => void) {
-    const m =
-      data.getAll("audio").length || data.getAll("attachment").length
-        ? await (
-            await import("./upload-recordings")
-          ).uploadRecordings(data, progress)
-        : await api<Meeting>("/meetings", { method: "POST", body: data });
+    // Text-only submissions need the same durable identity and receipt guard.
+    const m = await uploadRecordings(data, progress);
+    setOfflineDraftId(undefined);
     tagCompletion.current.expect(m.id);
     updateMeeting(m);
     setNewOpen(false);
@@ -710,6 +715,7 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
           </div>
         </header>
         <main className={`main-content ${current ? "detail-view" : ""}`}>
+          <OfflineQueue onOpen={id => {setOfflineDraftId(id);setNewOpen(true);}} onAccepted={m => {tagCompletion.current.expect(m.id);updateMeeting(m);}} />
           {error && (
             <div className="error-message app-error" role="alert">
               {error}
@@ -1553,8 +1559,10 @@ export default function App({ onChooseApp }: { onChooseApp: () => void }) {
       )}
       {newOpen && (
         <NewMeeting
+          key={offlineDraftId || "new"}
+          draftId={offlineDraftId}
           settings={settings}
-          onClose={() => setNewOpen(false)}
+          onClose={() => {setNewOpen(false);setOfflineDraftId(undefined);}}
           onCreate={create}
           onBot={requestBot}
           onSettings={() => setSettingsOpen(true)}

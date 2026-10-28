@@ -7,13 +7,43 @@ import ts from "typescript";
 import * as jsx from "react/jsx-runtime";
 import * as formats from "../supabase/functions/_shared/minutes-formats.mjs";
 import * as bot from "../supabase/functions/_shared/bot.mjs";
+import * as recordingLocation from "../src/recording-location.mjs";
 
-function harness(customTemplates = []) {
+async function harness(customTemplates = [], transforms = {}, fixture = {}) {
   const slots = [];
+  const effects = [];
+  const drafts = new Map(
+    fixture.draft ? [[fixture.draft.id, fixture.draft]] : [],
+  );
+  const scope = { ownerId: "synthetic-owner", actorId: "synthetic-actor" };
+  const newDraft = () => ({
+    id: "synthetic-draft",
+    revision: 1,
+    scope,
+    mode: "file",
+    metadata: {
+      title: "",
+      date: "2026-10-08",
+      participants: "",
+      template: "standard",
+    },
+    transcript: "",
+    files: [],
+    attachments: [],
+    sessionIds: [],
+    updatedAt: 1,
+  });
   let cursor = 0;
   const calls = [];
   const hooks = {
-    useEffect() {},
+    useEffect(effect, deps) {
+      const i = cursor++,
+        previous = slots[i];
+      if (!previous || deps.some((v, n) => v !== previous[n])) {
+        slots[i] = deps;
+        effects.push(effect);
+      }
+    },
     useState(initial) {
       const i = cursor++;
       slots[i] ??= { value: initial };
@@ -62,6 +92,8 @@ function harness(customTemplates = []) {
     Error,
     Promise,
     require(name) {
+      if (name === "./recording-location.mjs") return recordingLocation;
+      if (name === "./recording-location.css") return {};
       if (name === "react") return hooks;
       if (name === "react/jsx-runtime") return jsx;
       if (name === "lucide-react")
@@ -69,6 +101,46 @@ function harness(customTemplates = []) {
       if (name.endsWith("minutes-formats.mjs")) return formats;
       if (name.endsWith("bot.mjs")) return bot;
       if (name === "./Modal") return { Modal: () => null };
+      if (name === "./api") return { download() {} };
+      if (name === "./offline.css") return {};
+      // This handler harness tests form/location behavior. Authentication
+      // transitions are exercised by the real-browser scope regression.
+      if (name === "./offline-authorization")
+        return {
+          authenticationGeneration: () => 0,
+          useAuthenticationGeneration: () => 0,
+          assertAuthentication: (generation) => assert.equal(generation, 0),
+        };
+      if (name === "./offline-store")
+        return {
+          getDraft: async (id) => drafts.get(id),
+          listDrafts: async () => [...drafts.values()],
+          saveDraft: async (d) => {
+            const current = drafts.get(d.id);
+            if (
+              current?.attempt ||
+              (current?.revision || 0) !== (d.revision || 0)
+            )
+              throw new Error("revision conflict");
+            const next = { ...d, revision: (d.revision || 0) + 1 };
+            drafts.set(d.id, next);
+            return next;
+          },
+        };
+      if (name === "./upload-recordings")
+        return {
+          getUploadContext: async () => scope,
+          authorizeOfflineDraft: async (d) => {
+            assert.deepEqual(d.scope, scope);
+            return () => {};
+          },
+          createOfflineDraft: async () => {
+            const d = newDraft();
+            drafts.set(d.id, d);
+            return d;
+          },
+          discardOfflineDraft: async (id) => drafts.delete(id),
+        };
       if (name === "./Attachments") return { AttachmentPicker: () => null };
       if (name === "./cloud") return { isCloud: true };
       if (name === "./types")
@@ -84,15 +156,21 @@ function harness(customTemplates = []) {
             canRecordMeeting: false,
           }),
           isMobileDevice: () => false,
+          listRecoverableSessions: async () => [],
+          ...fixture.recorder,
         };
       if (name === "./split-recordings.mjs")
-        return { VIDEO_EXTENSIONS: [".mp4", ".mov"] };
+        return { VIDEO_EXTENSIONS: [".mp4", ".mov"], ...transforms };
       throw new Error(`Unexpected import ${name}`);
     },
   });
   function render() {
     cursor = 0;
-    return module.exports.NewMeeting(props);
+    const shell = module.exports.NewMeeting(props);
+    const result =
+      typeof shell.type === "function" ? shell.type(shell.props) : shell;
+    while (effects.length) effects.shift()();
+    return result;
   }
   function find(predicate, node = render()) {
     if (!node || typeof node !== "object") return null;
@@ -117,11 +195,146 @@ function harness(customTemplates = []) {
       preventDefault() {},
     });
   }
-  return { props, calls, render, find, change, mode, submit };
+  for (let i = 0; i < 8; i++) {
+    render();
+    await Promise.resolve();
+  }
+  return { props, calls, render, find, change, mode, submit, drafts };
 }
 
-test("New meeting opens directly on file input without format cards or selector", () => {
-  const h = harness();
+test("Recovered session location survives explicit draft metadata and a fresh form/File clone", async () => {
+  const point = {
+    latitude: 1.234567,
+    longitude: 2.345678,
+    accuracy: 8,
+    capturedAt: "2026-10-28T01:02:03.000Z",
+  };
+  const file = new File(["SYNTHETIC recovered"], "recovered.webm");
+  recordingLocation.rememberRecordingLocation(file, point);
+  const h = await harness(
+    [],
+    {},
+    {
+      recorder: {
+        listRecoverableSessions: async () => [
+          {
+            id: "session",
+            startedAt: 1,
+            scope: { ownerId: "synthetic-owner", actorId: "synthetic-actor" },
+            integrity: "complete",
+            expectedChunks: 1,
+            failedIndices: [],
+          },
+        ],
+        recoverSession: async () => file,
+      },
+    },
+  );
+  await h
+    .find((n) => n.type === "button" && n.props.children === "復元して追加")
+    .props.onClick();
+  await h.submit();
+  assert.deepEqual(JSON.parse(h.calls[0].get("recordingLocations")), [point]);
+  const saved = h.drafts.get("synthetic-draft");
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.sourceSessions)), [
+    "session",
+  ]);
+  const cloned = {
+    ...JSON.parse(JSON.stringify(saved)),
+    files: [new File([await file.arrayBuffer()], file.name)],
+  };
+  assert.equal(
+    recordingLocation.getRecordingLocation(cloned.files[0]),
+    null,
+    "a fresh File has no WeakMap metadata",
+  );
+  const reloaded = await harness([], {}, { draft: cloned });
+  await reloaded.submit();
+  assert.deepEqual(JSON.parse(reloaded.calls[0].get("recordingLocations")), [
+    point,
+  ]);
+});
+
+test("Video extraction and automatic compression preserve the located source in the real form", async () => {
+  const point = {
+    latitude: 1.234567,
+    longitude: 2.345678,
+    accuracy: 8,
+    capturedAt: "2026-10-28T01:02:03.000Z",
+  };
+  const original = new File(["synthetic video"], "located.mp4");
+  recordingLocation.rememberRecordingLocation(original, point);
+  const transformed = [];
+  const h = await harness([], {
+    extractAudio: async (file) => {
+      transformed.push(["extract", file.name]);
+      const f = new File(["synthetic extracted audio"], "extracted.m4a");
+      Object.defineProperty(f, "size", { value: 100_000_001 });
+      return f;
+    },
+    compressAudio: async (file) => {
+      transformed.push(["compress", file.name]);
+      return new File(["synthetic compressed audio"], "compressed.m4a");
+    },
+  });
+  h.find((n) => n.type === "input" && n.props.type === "file").props.onChange({
+    target: { files: [original], value: "selected" },
+  });
+  for (let i = 0; i < 12; i++) {
+    h.render();
+    await Promise.resolve();
+  }
+  await h.submit();
+  assert.deepEqual(transformed, [
+    ["extract", "located.mp4"],
+    ["compress", "extracted.m4a"],
+  ]);
+  assert.equal(h.calls[0].get("audio").name, "compressed.m4a");
+  assert.deepEqual(JSON.parse(h.calls[0].get("recordingLocations")), [point]);
+});
+
+test("Location follows append/reorder/remove and persists explicitly outside File objects", async () => {
+  const h = await harness();
+  const point = {
+    latitude: 1.234567,
+    longitude: 2.345678,
+    accuracy: 8,
+    capturedAt: "2026-10-28T01:02:03.000Z",
+  };
+  const a = new File(["first"], "located.m4a"),
+    b = new File(["second"], "plain.m4a"),
+    c = new File(["third"], "added.m4a");
+  recordingLocation.rememberRecordingLocation(a, point);
+  const add = (files) =>
+    h
+      .find((n) => n.type === "input" && n.props.type === "file")
+      .props.onChange({ target: { files, value: "selected" } });
+  add([a, b]);
+  h.find((n) => n.props?.["aria-label"] === "録音2を上へ").props.onClick();
+  add([c]);
+  h.find((n) => n.props?.["aria-label"] === "録音1を解除").props.onClick();
+  await h.submit();
+  assert.deepEqual(
+    h.calls[0].getAll("audio").map((f) => f.name),
+    ["located.m4a", "added.m4a"],
+  );
+  assert.deepEqual(JSON.parse(h.calls[0].get("recordingLocations")), [
+    point,
+    null,
+  ]);
+  const saved = h.drafts.get("synthetic-draft");
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.sourceLocations)), [
+    point,
+    null,
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.sourceSessions)), [
+    null,
+    null,
+  ]);
+});
+
+test("New meeting opens directly on file input without format cards or selector", async () => {
+  const h = await harness();
   assert.equal(h.render().props.title, "議事録を作成");
   assert.match(h.render().props.subtitle, /3形式を自動/);
   assert.ok(h.find((n) => n.props?.className?.startsWith("drop-zone")));
@@ -140,7 +353,7 @@ test("New meeting opens directly on file input without format cards or selector"
 });
 
 test("Audio selection and ordering are preserved with the standard initial format", async () => {
-  const h = harness();
+  const h = await harness();
   h.find((n) => n.type === "input" && n.props.type === "file").props.onChange({
     target: {
       files: [
@@ -163,7 +376,7 @@ test("Audio selection and ordering are preserved with the standard initial forma
 });
 
 test("Text submission defaults to standard and preserves date, participants and attachments", async () => {
-  const h = harness();
+  const h = await harness();
   h.mode("テキスト");
   h.change((n) => n.type === "input" && n.props.maxLength === 160, "定例会議");
   h.change((n) => n.type === "input" && n.props.type === "date", "2026-10-07");
@@ -188,7 +401,7 @@ test("Text submission defaults to standard and preserves date, participants and 
 });
 
 test("Saved custom meeting settings fill metadata without changing the standard initial format", async () => {
-  const h = harness([
+  const h = await harness([
     {
       id: "custom",
       name: "週次定例",
@@ -208,7 +421,7 @@ test("Saved custom meeting settings fill metadata without changing the standard 
 });
 
 test("Bot requests use standard too; invalid Meet URLs are rejected without sending", async () => {
-  const h = harness();
+  const h = await harness();
   h.mode("Botを呼ぶ");
   h.change(
     (n) => n.type === "input" && n.props.maxLength === 160,

@@ -35,6 +35,7 @@ import {
   MAX_BATCH_SIZE,
   UploadSchema,
   uploadDocument,
+  uploadDigest,
   uploadPart,
 } from "../supabase/functions/_shared/upload.mjs";
 import {
@@ -82,6 +83,7 @@ const publicRecord = (record) => {
     analysisId,
     audioParts,
     uploadPlan,
+    uploadInput,
     attachments,
     attachmentPlan,
     removedAttachments,
@@ -136,6 +138,21 @@ export async function createApp({
   let currentModel = model;
   let currentTranscriptionModel = transcriptionModel;
   const busy = new Set();
+  // Short upload writes serialize without waiting for long-running AI jobs.
+  const uploadWrites = new Map();
+  async function waitForUploadWrite(id) {
+    while (uploadWrites.has(id)) await uploadWrites.get(id);
+  }
+  function beginUploadWrite(id) {
+    lock(id);
+    let release;
+    uploadWrites.set(id, new Promise(resolve => { release = resolve; }));
+    return (keepBusy = false) => {
+      if (!keepBusy) busy.delete(id);
+      uploadWrites.delete(id);
+      release();
+    };
+  }
   const jobs = new Set();
   const acquireGemini = createLocalGeminiGate();
   let settingsBusy = false;
@@ -441,8 +458,28 @@ export async function createApp({
     const meeting = existing || (await store.save(createDemo()));
     res.status(existing ? 200 : 201).json(publicRecord(meeting));
   });
-  app.post("/api/uploads", requireKey, async (req, res) => {
+  const uploadOwner = await uploadDigest({ dataDir });
+  app.get(["/api/uploads/context", "/api/upload-context"], (_req, res) => res.json({ ownerId: uploadOwner, actorId: "local", capabilities: { resumableUpload: 1 } }));
+  app.post("/api/uploads", async (req, res) => {
     const input = UploadSchema.parse(req.body);
+    const digest = await uploadDigest(input);
+    const id = input.uploadId || randomUUID();
+    await waitForUploadWrite(id);
+    const existing = store.get(id);
+    if (existing) {
+      if (!input.uploadId || existing.uploadIdentity?.planDigest !== digest) throw fail(409, "同じ送信IDの内容が異なります。");
+      return res.json(publicRecord(existing));
+    }
+    requireKey(req, res, (error) => { if (error) throw error; });
+    const releaseUpload = beginUploadWrite(id);
+    try {
+    if (input.uploadId) {
+      // Local trash is a durable tombstone; replay must not restore removed data.
+      let deleted = false;
+      try { await readFile(path.join(dataDir, "trash", id, "meeting.json")); deleted = true; }
+      catch (error) { if (error.code !== "ENOENT") throw error; }
+      if (deleted) throw fail(409, "削除済みの送信IDは再利用できません。");
+    }
     if (store.list().filter((m) => m.status === "uploading").length >= 2)
       throw fail(
         429,
@@ -456,23 +493,42 @@ export async function createApp({
       throw fail(428, "接続設定でGemini APIキーを設定してください。");
     const doc = uploadDocument(
       input,
-      randomUUID(),
+      id,
       currentModel,
       currentTranscriptionModel,
     );
+    if (input.uploadId) doc.uploadIdentity = { uploadId: id, ownerId: uploadOwner, planDigest: digest };
     await store.save(doc);
     res.status(201).json(publicRecord(doc));
+    } finally { releaseUpload(); }
   });
   app.post(
     "/api/meetings/:id/parts",
     express.raw({ type: () => true, limit: MAX_FILE_SIZE }),
     async (req, res) => {
       const id = req.params.id;
-      lock(id);
+      await waitForUploadWrite(id);
+      const snapshot = getMeeting(id);
+      const replayIndex = Number(req.query.index);
+      const replayPlan = snapshot.uploadIdentity && snapshot.uploadPlan?.[replayIndex];
+      if (replayPlan && snapshot.audioParts[replayIndex]) {
+        if (!Buffer.isBuffer(req.body) || req.body.length !== replayPlan.size) throw fail(400, "録音のサイズが一致しません。");
+        if (await attachmentDigest(req.body) !== replayPlan.sha256) throw fail(409, "録音の内容が一致しません。");
+        return res.json(publicRecord(getMeeting(id)));
+      }
+      const releaseUpload = beginUploadWrite(id);
       let destination;
       let saved = false;
       try {
         const doc = getMeeting(id);
+        const index = Number(req.query.index);
+        const planned = doc.uploadPlan?.[index];
+        if (doc.uploadIdentity && planned) {
+          if (!Buffer.isBuffer(req.body) || req.body.length !== planned.size) throw fail(400, "録音のサイズが一致しません。");
+          const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", req.body)), b => b.toString(16).padStart(2,"0")).join("");
+          if (hash !== planned.sha256) throw fail(409, "録音の内容が一致しません。");
+          if (doc.audioParts[index]) return res.json(publicRecord(doc));
+        }
         let expected;
         try {
           expected = uploadPart(doc, Number(req.query.index));
@@ -494,16 +550,19 @@ export async function createApp({
         saved = true;
         res.json(publicRecord(next));
       } finally {
-        busy.delete(id);
+        releaseUpload();
         if (!saved && destination) await unlink(destination).catch(() => {});
       }
     },
   );
-  app.post("/api/meetings/:id/complete", requireKey, async (req, res) => {
+  app.post("/api/meetings/:id/complete", async (req, res) => {
+    await waitForUploadWrite(req.params.id);
     const doc = getMeeting(req.params.id);
     if (doc.status !== "uploading")
       return res.status(202).json(publicRecord(doc));
-    lock(doc.id);
+    requireKey(req, res, (error) => { if (error) throw error; });
+    const releaseUpload = beginUploadWrite(doc.id);
+    let started = false;
     try {
       if (
         doc.audioParts.length !== doc.uploadPlan.length ||
@@ -519,12 +578,13 @@ export async function createApp({
       const next = await store.save({
         ...doc,
         status: doc.audioParts.length ? "transcribing" : "analyzing",
+        ...(doc.uploadIdentity ? { uploadReceipt: { ...doc.uploadIdentity, meetingId: doc.id, status: "accepted" } } : {}),
       });
       startJob(doc.id);
+      started = true;
       res.status(202).json(publicRecord(next));
-    } catch (error) {
-      busy.delete(doc.id);
-      throw error;
+    } finally {
+      releaseUpload(started);
     }
   });
   app.post(
@@ -778,7 +838,8 @@ export async function createApp({
     attachmentUpload.single("attachment"),
     async (req, res) => {
       const meetingId = req.params.id;
-      lock(meetingId);
+      await waitForUploadWrite(meetingId);
+      const releaseUpload = beginUploadWrite(meetingId);
       let destination,
         accepted = false;
       try {
@@ -786,10 +847,20 @@ export async function createApp({
           file = req.file;
         if (!file) throw fail(400, "添付資料を選択してください。");
         const receivedName = Buffer.from(file.originalname, "latin1").toString("utf8");
-        const digest = meeting.status === "uploading" &&
-            meeting.attachmentPlan?.some((entry) => entry.id === req.body.id && entry.sha256)
+        const resumablePlan = meeting.uploadIdentity && meeting.attachmentPlan?.find((entry) => entry.id === req.body.id);
+        const digest = resumablePlan || (meeting.status === "uploading" &&
+            meeting.attachmentPlan?.some((entry) => entry.id === req.body.id && entry.sha256))
           ? await attachmentDigest(file.buffer)
           : null;
+        if (resumablePlan) {
+          if (file.size !== resumablePlan.size || digest !== resumablePlan.sha256) throw fail(409, "選択時の添付資料と一致しません。");
+          const existing = meeting.attachments?.find((entry) => entry.id === req.body.id);
+          if (existing) {
+            if (existing.sha256 !== digest || existing.size !== file.size) throw fail(409, "資料の内容が一致しません。");
+            return res.json(publicRecord(meeting));
+          }
+          if (meeting.uploadReceipt) throw fail(409, "保存後に削除された資料は再送できません。");
+        }
         const name = checkAttachmentAdd(meeting, {
           id: z.uuid().parse(req.body.id),
           name: receivedName,
@@ -810,13 +881,13 @@ export async function createApp({
           ...meeting,
           attachments: [
             ...(meeting.attachments || []),
-            { ...attachment, localFile },
+            { ...attachment, ...(resumablePlan ? { sha256: digest } : {}), localFile },
           ],
         });
         accepted = true;
         res.status(201).json(publicRecord(saved));
       } finally {
-        busy.delete(meetingId);
+        releaseUpload();
         if (destination && !accepted) await unlink(destination).catch(() => {});
       }
     },

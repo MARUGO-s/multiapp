@@ -1,0 +1,26 @@
+.recording-locations {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+}
+.recording-location-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.recording-location-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recording-location-option input {
+  width: auto;
+}
+@media print {
+  .recording-locations {
+    display: none !important;
+  }
+}

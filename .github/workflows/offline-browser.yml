@@ -1,0 +1,26 @@
+name: Offline recording browser safety
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # ubuntu-latest provides Chrome; no provider keys or secrets are passed.
+      - run: google-chrome --version
+      - run: npm run test:offline-browser
+        env:
+          KOTONOHA_OFFLINE_EVIDENCE: ${{ runner.temp }}/kotonoha-browser-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-recording-browser-evidence
+          path: ${{ runner.temp }}/kotonoha-browser-evidence
