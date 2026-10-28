@@ -244,3 +244,11 @@ Webhook（サーバー → Bot）: `POST $MEETBOT_WEBHOOK_URL`、`Content-Type: 
 会議の削除は `kotonoha.meetings.deleted_at` に削除日時を設定します。管理者は本人・会議IDを照合したうえで、その1行のみ `deleted_at = null` に戻して復元できます。完全消去は対象の会議ID・所有者ID・audio_path・document.audioPartsの全保存パスを照合し、対象音声と会議行のみを削除します。DBスキーマやバケット全体の削除は行わないでください。
 
 ログインできない場合は、共通IDの入力、パスワード、試行回数制限を確認してください。共用Supabase Authのユーザー・パスワード・メール設定を変更してはいけません。
+
+## 2026-10-28 録音保全・再送の公開記録
+
+機能release: PR #76 / `b7d3a3c533a4f42ca692cb1705254550e540eeb2`。`Recipe-Management / hjhkccbktkscwtgzxjfq` に対象migration `20261028000100_kotonoha_resumable_upload.sql` だけをガード付き単一transactionで適用し、同じ本文をmigration台帳へ登録しました。RPCはservice_roleのみ実行可、既存会議75件不変をtransaction内で検証。`db push`/reset/他project変更はしていません。
+
+`kotonoha-api` v57はACTIVE、downloadした24ファイルがrelease sourceと全一致、他25関数のmetadata不変。元のJWT gateway設定は維持しました。Pages run [40661431000](https://github.com/MARUGO-s/multiapp/actions/runs/40661431000) はbuild・Chrome18組・deploy成功、https://marugo-waltz.com/ の266ファイルを通常/cache-bustedの532応答で全件hash照合。匿名401/CORS204と公開ログイン画面の架空ID入力・書込要求0を確認しました。実ログイン/実録音/GPS/有料AIは試していません。
+
+ロールバックは旧UI/API `519815771414a4766ed5474d296d8cfd34bb0b8c` を対象限定で再配信し、追加RPC/台帳/保存中の下書きは削除しません。新UIを先に旧APIへ向けるとcapability確認で送信を停止して原本を残します。詳しい仕様・隔離検証は [録音保全](docs/offline-recording.md)。
