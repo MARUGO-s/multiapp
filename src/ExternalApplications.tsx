@@ -5,6 +5,7 @@ import {
   Landmark,
   MessageCircle,
   NotebookPen,
+  NotebookText,
   Share2,
   Star,
 } from "lucide-react";
@@ -16,6 +17,7 @@ const icons: Record<string, typeof FileText> = {
   management: Landmark,
   chat: MessageCircle,
   journal: NotebookPen,
+  "talk-organizer": NotebookText,
   gourmet: Star,
   sns: Share2,
 };

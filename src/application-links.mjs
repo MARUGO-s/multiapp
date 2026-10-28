@@ -36,6 +36,13 @@ export const applicationLinks = [
     href: "https://marugo-s.github.io/line_report/jnm/jnl2txt.html",
   },
   {
+    id: "talk-organizer",
+    name: "tsumugi",
+    note: "トーク履歴の整理・検索",
+    icon: "talk-organizer",
+    href: "https://marugo-s.github.io/talk-organizer/",
+  },
+  {
     id: "gourmet",
     name: "mimiyori",
     note: "口コミ・グルメサイト管理",
