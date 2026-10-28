@@ -4,7 +4,7 @@
 
 2026-10-28 JST。ユーザーが、スマートフォンの電波が悪い状態で直接録音し、送信エラー後に録音ファイルも失ったと報告。完全なオフラインだけでなく、接続表示がオンラインでも通信不良・タイムアウトなどで送信できない場合に、端末内で保存し、通信が安定した後に再開することを依頼した。
 
-録音保全・再送と任意の録音開始位置は統合実装・修正・検証済み。2026-10-28、ユーザーが本番公開を承認した。位置原文削除・アカウント分離・複数タブ競合・録音完全性・入力復元のレビュー指摘を修正し、backend再レビューと実装者とは別の親によるfrontend再レビューを通過した。公開手順を実行する直前の状態で、以下の隔離検証を本番の実機保存成功とは区別する。公開後のcommit・DB/API/画面読み戻しは末尾へ追記する。
+録音保全・再送と任意の録音開始位置は2026-10-28 JSTに本番公開済み。機能releaseはPR #76 / `b7d3a3c533a4f42ca692cb1705254550e540eeb2`。対象DB→kotonoha-api v57→Pagesの順に反映し、配信内容と権限を読み戻した。位置原文削除・アカウント分離・複数タブ競合・録音完全性・入力復元の指摘を修正した。以下の隔離検証と本番の配信確認は、実スマートフォンでの録音・実ログイン後の業務保存成功とは区別する。公開証跡と未検証範囲は末尾参照。
 
 ## 調査で確認した既存の問題
 
@@ -63,4 +63,15 @@ DBは実PostgreSQL17の隔離Dockerでlatest migration chain、従来RPC定義/A
 
 画面側の独立レビューで別accountのローカル下書き露出、Worker準備中の別タブ編集を古い送信receiptで消す競合、保存abort後reload時の欠落録音の正常復元、Meet URL未保存を再現したため、公開前に修正した。現認証世代・owner/actor照合、draft revision CASと固定session集合、録音の永続integrity/expectedChunksと連続index照合、Meet URL・録音モード・位置取得設定の保存復元を追加。完全性を確認できない旧形式・中断録音は原音を残して通常取り込みを停止し、完全な復元を保証しない。Botの自動再実行は追加していない。
 
-修正担当の最終実行は中断されたため成功扱いにせず、親が同じcandidateで `npm run check`（354件中351成功・3skip・失敗0、build成功）、`npm run test:offline-browser`（18/18 suites成功）、workflow Deno（18/18 commands成功）、実PGのprivacy・再送・改ざん・権限・競合試験を再実行して成功を確認した。初回の終了不明・タイムアウトログは証跡へ保持した。PRとPagesには秘密不要の実Chromeブラウザー安全性ジョブを組み込み、Pages公開はbrowser/build両成功を必須とする。画面側の再レビュー委任は中断したため成功とは扱わず、実装者とは別の親がsource・旧独立probeを再確認し、安全期待値の4ケース（他account非表示/原音非取得/cleanup callback無し、準備中競合のPOST0と新原本保全、chunk abort後reload復元拒否、Meet URL復元）を独立実行して成功した。上記18ブラウザー組には認証応答body待機中切替・先頭/中間/末尾欠損・失敗印保存不可・入力設定復元も含む。本番公開と読み戻しは次の公開手順で確認する。
+修正担当の最終実行は中断されたため成功扱いにせず、親が同じcandidateで `npm run check`（354件中351成功・3skip・失敗0、build成功）、`npm run test:offline-browser`（18/18 suites成功）、workflow Deno（18/18 commands成功）、実PGのprivacy・再送・改ざん・権限・競合試験を再実行して成功を確認した。初回の終了不明・タイムアウトログは証跡へ保持した。PRとPagesには秘密不要の実Chromeブラウザー安全性ジョブを組み込み、Pages公開はbrowser/build両成功を必須とする。画面側の再レビュー委任は中断したため成功とは扱わず、実装者とは別の親がsource・旧独立probeを再確認し、安全期待値の4ケース（他account非表示/原音非取得/cleanup callback無し、準備中競合のPOST0と新原本保全、chunk abort後reload復元拒否、Meet URL復元）を独立実行して成功した。上記18ブラウザー組には認証応答body待機中切替・先頭/中間/末尾欠損・失敗印保存不可・入力設定復元も含む。本番公開と読み戻しの結果は次に記録する。
+
+## 2026-10-28 本番公開の結果
+
+- 機能release: [PR #76](https://github.com/MARUGO-s/multiapp/pull/76) / `b7d3a3c533a4f42ca692cb1705254550e540eeb2`。公開先 https://marugo-waltz.com/ 。
+- DB: 対象migration `20261028000100` のみをガード付きtransactionで適用・同一本文を台帳登録。既存会議75件不変、RPC body MD5 `bc914412c93cdae79821c772121d8118`、台帳本文MD5 `2772128caf79021df5d1d5709cc8fdec` を確認。anon/authenticated実行不可・service_role実行可を読み戻した。
+- API: `kotonoha-api` v57 ACTIVE。downloadした24ファイルすべてreleaseと一致。他25関数のmetadata不変。元のgateway JWT設定を維持。対象originのCORS204と匿名401を確認。実ログイン後の業務保存成功を意味しない。
+- UI: [Pages 40661431000](https://github.com/MARUGO-s/multiapp/actions/runs/40661431000) のbuild・browser・deploy成功。artifact266件を通常URLとcache-busted URLの532応答で全件SHA-256一致確認。公開画面の架空ID入力保持・checkbox操作・pageerror0・書込要求0を確認。
+- CI初回は新しいrunnerのscratch親不存在と、Playwrightがasync predicateのPromiseをtruthy扱いするテスト側不具合で停止し、未mergeのまま修正。async IndexedDB観測を明示awaitする共通helperと全体期限、未解決/期限後truthy拒否の回帰を追加。実アプリの入力・保存経路はこの修正で変更していない。追加独立レビューの期限指摘も修正し、RED→GREEN後の最終Node357件中354成功・3既存skip・失敗0、build成功、Chrome18/18、PR/Pages CI成功。
+- 証跡: `kotonoha-release-evidence/db-apply.json`、`db-readback.json`、`db-grants-readback.json`、`api-verification.json`、`pages-40661431000/summary.json`、`live-ui-smoke.json`、`npm-deadline-fix.log`、`browser-deadline-fix.log`。秘密や業務本文は知識ノートへ保存しない。
+- 未検証: 実iPhone/Androidのマイク・GPS・OS強制終了、実ログイン後の本番会議作成、有料AI呼び出し。ブラウザー保存領域の消去や端末故障を越える復旧は保証しない。以前すでに消えた録音を復元したものではない。
+- ロールバック: UI/APIを直前の `519815771414a4766ed5474d296d8cfd34bb0b8c` に限定再配信。追加RPC・migration台帳・下書き・録音を削除しない。旧APIへ新UIが接続した場合はcapability確認で送信を止め原本を残す。元repo main34ae387と`.claude`は変更しない。
