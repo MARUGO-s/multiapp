@@ -40,6 +40,7 @@ import { GROUP_STORE_NAMES } from "../_shared/store-names.mjs";
 import {
   MAX_BATCH_SIZE,
   uploadDocument,
+  uploadDigest,
   uploadPart,
   UploadSchema,
 } from "../_shared/upload.mjs";
@@ -204,6 +205,7 @@ function expose(record: RecordRow) {
     audioFile: _audioFile,
     audioParts: _audioParts,
     uploadPlan: _uploadPlan,
+    uploadInput: _uploadInput,
     partReady: _partReady,
     attachments: _attachments,
     attachmentPlan: _attachmentPlan,
@@ -798,14 +800,21 @@ async function appendPart(
 ): Promise<RecordRow> {
   const index = Number(new URL(req.url).searchParams.get("index"));
   let expected;
+  const planned = record.document.uploadIdentity && record.document.uploadPlan?.[index];
   try {
-    expected = uploadPart(record.document, index);
+    expected = planned || uploadPart(record.document, index);
   } catch (error) {
     throw fail(409, (error as Error).message);
   }
   const bytes = await bodyBytes(req, expected.size);
   if (bytes.length !== expected.size) {
     throw fail(400, "録音のサイズが一致しません。");
+  }
+  if (record.document.uploadIdentity) {
+    const digest = await attachmentDigest(bytes);
+    if (digest !== expected.sha256) throw fail(409, "録音の内容が一致しません。");
+    if (record.document.audioParts[index]) return record;
+    expected = uploadPart(record.document, index);
   }
   const partPath = `${owner}/${id}/${crypto.randomUUID()}-${expected.name}`;
   const ext = expected.name.split(".").pop();
@@ -828,13 +837,15 @@ async function appendPart(
     throw fail(503, "音声を保存できませんでした。再度取り込んでください。");
   }
   try {
-    return await store(
+    const appended = await store(
       "append",
       owner,
       id,
       { index, part: { ...expected, audioPath: partPath, transcript: "" } },
-      "kotonoha_audio_upload",
+      record.document.uploadIdentity ? "kotonoha_resumable_upload" : "kotonoha_audio_upload",
     );
+    if (appended.document.audioParts[index]?.audioPath !== partPath) await service.storage.from(BUCKET).remove([partPath]);
+    return appended;
   } catch (error) {
     // A network error may mean the append committed but its response was
     // lost. Do not destroy a potentially registered recording in that case.
@@ -850,6 +861,8 @@ async function completeUpload(
   config: Doc,
   record: RecordRow,
 ): Promise<RecordRow> {
+  // Receipt is the durable upload acknowledgement, not permission to rerun AI.
+  if (record.document.uploadIdentity && record.document.uploadReceipt) return record;
   const keys = await getKeys(
     owner,
     config,
@@ -860,7 +873,7 @@ async function completeUpload(
     owner,
     id,
     { runId: crypto.randomUUID() },
-    "kotonoha_attachments",
+    record.document.uploadIdentity ? "kotonoha_resumable_upload" : "kotonoha_attachments",
   );
   return reconcile(owner, claimed, keys);
 }
@@ -1137,6 +1150,11 @@ export async function handler(req: Request) {
       return json(null, 204);
     }
     const owner = session.workspaceId;
+    if (["/uploads/context", "/upload-context"].includes(route)) {
+      if (req.method !== "GET") throw fail(405, "この操作には対応していません。");
+      const context = await store("context", owner, null, { tokenHash }, "kotonoha_resumable_upload");
+      return json({ ...context, capabilities: { resumableUpload: 1 } });
+    }
     const config = await store("get", owner, null, {}, "kotonoha_settings");
     if (route === "/settings" && req.method === "GET") {
       return json(exposeSettings(config));
@@ -1202,24 +1220,22 @@ export async function handler(req: Request) {
     }
     if (route === "/uploads" && req.method === "POST") {
       const input = UploadSchema.parse(await jsonBody(req));
-      await getKeys(
-        owner,
-        config,
-        input.sources.length ? config.transcriptionModel : null,
-      );
-      const id = crypto.randomUUID();
-      const record = await store(
-        "create",
-        owner,
-        id,
-        {
-          document: {
-            ...uploadDocument(input, id, config.model, config.transcriptionModel),
-            analysisId: crypto.randomUUID(),
-          },
-        },
-        "kotonoha_audio_upload",
-      );
+      const id = input.uploadId || crypto.randomUUID();
+      const identity = input.uploadId ? { uploadId: id, ownerId: owner, planDigest: await uploadDigest(input) } : null;
+      const payload = { document: {
+        ...uploadDocument(input, id, config.model, config.transcriptionModel),
+        ...(identity ? { uploadIdentity: identity } : {}),
+        analysisId: crypto.randomUUID(),
+      } };
+      // Read-only locked replay check before provider configuration. An accepted
+      // upload remains acknowledgeable after settings or location were edited.
+      if (input.uploadId) {
+        const existing = await store("lookup", owner, id, payload, "kotonoha_resumable_upload");
+        if (existing) return json(expose(existing), 201);
+      }
+      await getKeys(owner, config, input.sources.length ? config.transcriptionModel : null);
+      const record = await store("create", owner, id, payload,
+        input.uploadId ? "kotonoha_resumable_upload" : "kotonoha_audio_upload");
       return json(expose(record), 201);
     }
     if (route === "/bot/requests" && req.method === "POST") {
@@ -1462,10 +1478,20 @@ export async function handler(req: Request) {
           throw fail(400, "資料を1ファイルずつ送信してください。");
         }
         const id = z.uuid().parse(form.get("id"));
-        const digest = record.document.status === "uploading" &&
-            record.document.attachmentPlan?.some((entry: Doc) => entry.id === id && entry.sha256)
+        const resumablePlan = record.document.uploadIdentity && record.document.attachmentPlan?.find((entry: Doc) => entry.id === id);
+        const digest = resumablePlan || (record.document.status === "uploading" &&
+            record.document.attachmentPlan?.some((entry: Doc) => entry.id === id && entry.sha256))
           ? await attachmentDigest(await file.arrayBuffer())
           : null;
+        if (resumablePlan) {
+          if (file.size !== resumablePlan.size || digest !== resumablePlan.sha256) throw fail(409, "選択時の添付資料と一致しません。");
+          const existing = record.document.attachments?.find((entry: Doc) => entry.id === id);
+          if (existing) {
+            if (existing.sha256 !== digest || existing.size !== file.size) throw fail(409, "資料の内容が一致しません。");
+            return json(expose(record));
+          }
+          if (record.document.uploadReceipt) throw fail(409, "保存後に削除された資料は再送できません。");
+        }
         const submitted = {
           id,
           name: file.name,
@@ -1498,18 +1524,18 @@ export async function handler(req: Request) {
           );
         }
         try {
-          return json(
-            expose(
-              await store(
-                "add",
-                owner,
-                meetingId,
-                { attachment: { ...attachment, storagePath } },
-                "kotonoha_attachments",
-              ),
-            ),
-            201,
+          const saved = await store(
+            resumablePlan ? "attachment" : "add",
+            owner,
+            meetingId,
+            { attachment: { ...attachment, ...(resumablePlan ? { sha256: digest } : {}), storagePath } },
+            resumablePlan ? "kotonoha_resumable_upload" : "kotonoha_attachments",
           );
+          // A concurrent identical request may already own the persisted path.
+          if (resumablePlan && saved.document.attachments?.find((f: Doc) => f.id === id)?.storagePath !== storagePath) {
+            await service.storage.from(DOCUMENT_BUCKET).remove([storagePath]);
+          }
+          return json(expose(saved), 201);
         } catch (error) {
           if ([400, 404, 409].includes((error as any).status)) {
             await service.storage.from(DOCUMENT_BUCKET).remove([storagePath]);

@@ -1726,6 +1726,28 @@ Deno.test(
       for (const body of [{ period: "custom" }, { period: "custom", start: "2026-02-30", end: "2026-03-01" }, { period: "custom", start: "2026-03-01", end: "2026-02-28" }, { period: "custom", start: "9999-01-01", end: "9999-01-02" }]) {
         assert.equal((await request("/summary", "valid-a", postInsight(body))).status, 400);
       }
+      // Synthetic coordinates, existing shared-workspace auth only; no new public route.
+      const locationPoint = { latitude: 1.234567, longitude: 2.345678, accuracy: 8, capturedAt: "2026-10-28T01:02:03.000Z" };
+      const locationMeeting = { ...createDemo(), isDemo: false, source: "text", sources: [{ name: "架空の録音.webm", size: 100, startLocation: locationPoint }], recordingLocations: [{ sourceIndex: 0, ...locationPoint }] };
+      rows.set(locationMeeting.id, { owner, document: locationMeeting, audioPath: null, responseId: null });
+      const locationRoute = `/meetings/${locationMeeting.id}`;
+      const removeLocation = { method: "PATCH", body: JSON.stringify({ recordingLocations: null }) };
+      assert.equal((await request(locationRoute, "invalid", removeLocation)).status, 401);
+      assert.deepEqual((await (await request(locationRoute, "valid-b")).json()).recordingLocations, locationMeeting.recordingLocations);
+      for (const invalid of [[], [locationPoint], {}]) assert.equal((await request(locationRoute, "valid-a", { method: "PATCH", body: JSON.stringify({ recordingLocations: invalid }) })).status, 400);
+      assert.equal((await request(locationRoute, "valid-a", removeLocation)).status, 200);
+      assert.equal((await request(locationRoute, "valid-b", removeLocation)).status, 200);
+      assert.deepEqual(rows.get(locationMeeting.id).document.recordingLocations, []);
+      assert.equal(rows.get(locationMeeting.id).document.sources[0].startLocation, undefined);
+      assert.equal((await request(`${locationRoute}/complete`, "valid-a", { method: "POST" })).status, 202);
+      assert.equal((await request(`${locationRoute}/retry`, "valid-a", { method: "POST" })).status, 202);
+      await drain();
+      await request("/meetings"); await drain(); await request("/meetings"); await drain();
+      const locationReload = await (await request(locationRoute, "valid-b")).json();
+      assert.equal(locationReload.status, "done");
+      assert.deepEqual(locationReload.recordingLocations, []);
+      assert.equal(locationReload.sources[0].startLocation, undefined);
+      console.log("PASS Cloud HTTP recording location shared auth/delete/replay/reanalysis");
       assert.equal(
         (await request("/auth/logout", loginSession.token, { method: "POST" }))
           .status,

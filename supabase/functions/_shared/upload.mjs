@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { MetadataSchema, MAX_FILE_SIZE, MAX_TEXT_LENGTH } from "./domain.mjs";
 import { AttachmentPlanSchema } from "./attachments.mjs";
+import { RecordingLocationSchema } from "./recording-location.mjs";
 export const MAX_BATCH_SIZE = 100_000_000;
 const SourceSchema = z
   .object({
     name: z.string().min(1).max(500),
     size: z.number().int().positive().max(MAX_BATCH_SIZE),
+    startLocation: RecordingLocationSchema.optional(),
   })
   .strict();
 const PartSchema = z
@@ -15,10 +17,12 @@ const PartSchema = z
     sourceIndex: z.number().int().min(0).max(4),
     partNumber: z.number().int().positive(),
     duration: z.number().positive().max(610),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   })
   .strict();
 export const UploadSchema = z
   .object({
+    uploadId: z.string().uuid().optional(),
     metadata: MetadataSchema,
     sources: z.array(SourceSchema).max(5),
     parts: z.array(PartSchema).max(512),
@@ -28,6 +32,7 @@ export const UploadSchema = z
   .strict()
   .superRefine((value, ctx) => {
     const bad = (message) => ctx.addIssue({ code: "custom", message });
+    if (value.uploadId && [...value.parts, ...value.attachments].some(p => !p.sha256)) bad("再送用のファイルハッシュが不足しています。");
     if (Boolean(value.sources.length) === Boolean(value.transcript))
       bad("音声または会話テキストのどちらか一方を入力してください。");
     if (value.sources.reduce((n, s) => n + s.size, 0) > MAX_BATCH_SIZE)
@@ -53,6 +58,7 @@ export function uploadDocument(
   transcriptionModel = "gpt-transcribe",
 ) {
   return {
+    ...(input.uploadId ? { uploadInput: input } : {}),
     ...input.metadata,
     id,
     createdAt: new Date().toISOString(),
@@ -61,6 +67,8 @@ export function uploadDocument(
     isDemo: false,
     fileName: input.sources[0]?.name || null,
     sources: input.sources,
+    recordingLocations: input.sources.flatMap((source, sourceIndex) =>
+      source.startLocation ? [{ sourceIndex, ...source.startLocation }] : []),
     uploadPlan: input.parts,
     audioParts: [],
     attachmentPlan: input.attachments || [],
@@ -79,6 +87,13 @@ export function uploadDocument(
     transcriptionModel: input.sources.length ? transcriptionModel : null,
   };
 }
+export async function uploadDigest(input) {
+  const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object"
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  const bytes = new TextEncoder().encode(JSON.stringify(canonical(input)));
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), b => b.toString(16).padStart(2, "0")).join("");
+}
+
 export function uploadPart(document, index) {
   if (document.status !== "uploading")
     throw Object.assign(new Error("アップロードは終了しています。"), {

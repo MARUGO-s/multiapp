@@ -1,3 +1,9 @@
+export interface RecordingLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  capturedAt: string;
+}
 export interface Action {
   task: string;
   owner: string;
@@ -44,6 +50,8 @@ export interface Attachment {
   uploadedAt: string;
 }
 export interface Meeting {
+  recordingLocations?: (RecordingLocation & { sourceIndex: number })[];
+  sources?: { name: string; size: number; startLocation?: RecordingLocation }[];
   calendarOverrides?: Record<
     string,
     {
