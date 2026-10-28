@@ -13,16 +13,17 @@ const expected = [
   "https://marugo-s.github.io/management/",
   "https://marugo-s.github.io/line_report/chat.html",
   "https://marugo-s.github.io/line_report/jnm/jnl2txt.html",
+  "https://marugo-s.github.io/talk-organizer/",
   "https://marugo-s.github.io/gourmet/",
   "https://marugo-s.github.io/sns_management/",
 ];
 
-test("Application launcher preserves all seven exact public destinations without credentials", () => {
+test("Application launcher preserves all eight exact public destinations without credentials", () => {
   assert.deepEqual(
     applicationLinks.map((app) => app.href),
     expected,
   );
-  assert.equal(new Set(applicationLinks.map((app) => app.id)).size, 7);
+  assert.equal(new Set(applicationLinks.map((app) => app.id)).size, 8);
   for (const app of applicationLinks) {
     const url = new URL(app.href);
     assert.equal(url.protocol, "https:");
@@ -35,7 +36,7 @@ test("Application launcher preserves all seven exact public destinations without
   }
 });
 
-test("Launcher preserves seven app links and adds a separate admin-only destination", () => {
+test("Launcher preserves eight app links and adds a separate admin-only destination", () => {
   const source = readFileSync(
     new URL("../src/ExternalApplications.tsx", import.meta.url),
     "utf8",
@@ -69,7 +70,7 @@ test("Launcher preserves seven app links and adds a separate admin-only destinat
     [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
     [...expected, "/multiapp/?admin=users"],
   );
-  assert.equal((html.match(/<a /g) || []).length, 8);
+  assert.equal((html.match(/<a /g) || []).length, 9);
   assert.match(html, /登録ユーザー管理（管理者専用）/);
   assert.match(html, /<nav[^>]+aria-labelledby="external-applications-title"/);
   assert.match(html, /id="external-applications-title"/);
@@ -79,6 +80,16 @@ test("Launcher preserves seven app links and adds a separate admin-only destinat
     assert.ok(html.includes(`<strong>${app.name}</strong>`));
     assert.ok(html.includes(`<small>${app.note}</small>`));
   }
+});
+
+test("tsumugi opens talk organizer without forwarding the portal session", () => {
+  assert.deepEqual(applicationLinks.find((app) => app.id === "talk-organizer"), {
+    id: "talk-organizer",
+    name: "tsumugi",
+    note: "トーク履歴の整理・検索",
+    icon: "talk-organizer",
+    href: "https://marugo-s.github.io/talk-organizer/",
+  });
 });
 
 test("mimiyori launcher describes review and gourmet-site management, not reservations", () => {
