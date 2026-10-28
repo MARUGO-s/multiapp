@@ -2,6 +2,7 @@
 // Synthetic GPS + Chrome fake microphone only. No provider, DB or remote access.
 import { createServer } from "vite";
 import { chromium } from "playwright";
+import { waitForBrowserState } from "./wait-for-browser-state.mjs";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { once } from "node:events";
@@ -135,7 +136,7 @@ try {
   await page
     .getByRole("button", { name: "停止して追加", exact: true })
     .waitFor();
-  await page.waitForFunction(async () => {
+  await waitForBrowserState(page, async () => {
     const r = await import("/src/recording.ts");
     return (await r.listRecoverableSessions()).some((s) => s.startLocation);
   });
@@ -143,17 +144,15 @@ try {
   await context.setOffline(true);
   await page.getByRole("button", { name: "停止して追加", exact: true }).click();
   // Imports used below were already loaded by the real component. No new offline module fetch.
-  await page.waitForFunction(async () => {
-    const s = await import("/src/offline-store.ts");
-    const [d] = await s.listDrafts();
-    return (
-      d?.files.length === 1 && d.sourceLocations?.[0]?.latitude === 1.234567
-    );
-  });
-  const initial = await page.evaluate(async () => {
+  // Await each async IndexedDB observation and retain its successful snapshot.
+  const initial = await waitForBrowserState(page, async () => {
     const s = await import("/src/offline-store.ts"),
       r = await import("/src/recording.ts");
     const [d] = await s.listDrafts();
+    if (
+      d?.files.length !== 1 ||
+      d.sourceLocations?.[0]?.latitude !== 1.234567
+    ) return false;
     return {
       id: d.id,
       file: d.files[0].name,
@@ -162,6 +161,7 @@ try {
       sessions: (await r.listRecoverableSessions()).map((s) => s.id),
     };
   });
+
   assert.equal(initial.sessions.length, 1);
   assert.ok(initial.size > 0);
   rows.push("record → offline draft + original/session + explicit location");

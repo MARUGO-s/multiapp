@@ -1,6 +1,7 @@
 // FR-LOGIC-03: actual NewMeeting all form values survive reload; never run Bot.
 import { createServer } from "vite";
 import { chromium } from "playwright";
+import { waitForBrowserState } from "./wait-for-browser-state.mjs";
 import assert from "node:assert/strict";
 const source = `import React from'react';import{createRoot}from'react-dom/client';import{NewMeeting}from'/src/NewMeeting.tsx';window.mount=()=>createRoot(document.getElementById('root')).render(React.createElement(NewMeeting,{settings:{configured:true},templates:[],onClose:()=>{},onSettings:()=>{},onBot:()=>{window.botCalls++},onCreate:()=>{window.creates++}}));`;
 const server = await createServer({
@@ -77,7 +78,7 @@ try {
   await p
     .getByLabel("Google MeetのURL", { exact: false })
     .fill("https://meet.google.com/abc-defg-hij");
-  await p.waitForFunction(async () => {
+  await waitForBrowserState(p, async () => {
     const s = await import("/src/offline-store.ts");
     return (await s.listDrafts()).some(
       (d) => d.mode === "bot" && d.metadata.title === "PERSISTED TITLE",

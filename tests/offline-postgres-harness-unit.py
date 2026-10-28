@@ -35,6 +35,8 @@ class HarnessSafety(unittest.TestCase):
         self.run_failure(log_failure=True)
 
     def run_failure(self,log_failure):
+        # Fresh CI runners do not have the agent's scratch parent yet.
+        module.SCRATCH.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='offline-pg-unit-',dir=module.SCRATCH) as directory:
             commands=[]
             def fake(command,**kwargs):
