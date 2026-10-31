@@ -50,6 +50,13 @@ export const applicationLinks = [
     href: "https://marugo-s.github.io/gourmet/",
   },
   {
+    id: "restaurant-insight",
+    name: "Restaurant Insight Studio",
+    note: "飲食店リサーチ・AI分析",
+    icon: "restaurant-insight",
+    href: "https://marugo-s.github.io/restaurant-insight-studio/",
+  },
+  {
     id: "sns",
     name: "Instatic TalksX",
     note: "SNS一括管理",

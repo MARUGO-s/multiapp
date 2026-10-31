@@ -6,6 +6,7 @@ import {
   MessageCircle,
   NotebookPen,
   NotebookText,
+  ScanSearch,
   Share2,
   Star,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const icons: Record<string, typeof FileText> = {
   journal: NotebookPen,
   "talk-organizer": NotebookText,
   gourmet: Star,
+  "restaurant-insight": ScanSearch,
   sns: Share2,
 };
 

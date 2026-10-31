@@ -15,15 +15,16 @@ const expected = [
   "https://marugo-s.github.io/line_report/jnm/jnl2txt.html",
   "https://marugo-s.github.io/talk-organizer/",
   "https://marugo-s.github.io/gourmet/",
+  "https://marugo-s.github.io/restaurant-insight-studio/",
   "https://marugo-s.github.io/sns_management/",
 ];
 
-test("Application launcher preserves all eight exact public destinations without credentials", () => {
+test("Application launcher preserves all nine exact public destinations without credentials", () => {
   assert.deepEqual(
     applicationLinks.map((app) => app.href),
     expected,
   );
-  assert.equal(new Set(applicationLinks.map((app) => app.id)).size, 8);
+  assert.equal(new Set(applicationLinks.map((app) => app.id)).size, 9);
   for (const app of applicationLinks) {
     const url = new URL(app.href);
     assert.equal(url.protocol, "https:");
@@ -36,7 +37,7 @@ test("Application launcher preserves all eight exact public destinations without
   }
 });
 
-test("Launcher preserves eight app links and adds a separate admin-only destination", () => {
+test("Launcher preserves nine app links and adds a separate admin-only destination", () => {
   const source = readFileSync(
     new URL("../src/ExternalApplications.tsx", import.meta.url),
     "utf8",
@@ -70,7 +71,7 @@ test("Launcher preserves eight app links and adds a separate admin-only destinat
     [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1]),
     [...expected, "/multiapp/?admin=users"],
   );
-  assert.equal((html.match(/<a /g) || []).length, 9);
+  assert.equal((html.match(/<a /g) || []).length, 10);
   assert.match(html, /登録ユーザー管理（管理者専用）/);
   assert.match(html, /<nav[^>]+aria-labelledby="external-applications-title"/);
   assert.match(html, /id="external-applications-title"/);
@@ -89,6 +90,16 @@ test("tsumugi opens talk organizer without forwarding the portal session", () =>
     note: "トーク履歴の整理・検索",
     icon: "talk-organizer",
     href: "https://marugo-s.github.io/talk-organizer/",
+  });
+});
+
+test("Restaurant Insight Studio opens its public page without forwarding the portal session", () => {
+  assert.deepEqual(applicationLinks.find((app) => app.id === "restaurant-insight"), {
+    id: "restaurant-insight",
+    name: "Restaurant Insight Studio",
+    note: "飲食店リサーチ・AI分析",
+    icon: "restaurant-insight",
+    href: "https://marugo-s.github.io/restaurant-insight-studio/",
   });
 });
 
